@@ -3138,12 +3138,12 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 		val |= HOSTPC1_DEVLC_PSPD(HOSTPC1_DEVLC_PSPD_HIGH_SPEED);
 		writel(val, base + HOSTPC1_DEVLC);
 #endif
-	pr_info(MODULE_NAME "%s(%d) - val=0x%x\n", __func__, __LINE__, val); /* HTC */
+		pr_info(MODULE_NAME "%s(%d) - val=0x%lx\n", __func__, __LINE__, val); /* HTC */
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_DETECT_SHORT_CONNECT;
 		writel(val, base + UHSIC_MISC_CFG0);
 		udelay(1);
-	pr_info(MODULE_NAME "%s(%d) - val=0x%x\n", __func__, __LINE__, val); /* HTC */
+		pr_info(MODULE_NAME "%s(%d) - val=0x%lx\n", __func__, __LINE__, val); /* HTC */
 
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_FORCE_XCVR_MODE;
@@ -3154,7 +3154,7 @@ int tegra_usb_phy_bus_idle(struct tegra_usb_phy *phy)
 		/* safe to enable RPU on STROBE at all times during idle */
 		val |= UHSIC_RPU_STROBE;
 		writel(val, base + UHSIC_PADS_CFG1);
-	pr_info(MODULE_NAME "%s(%d) - val=0x%x\n", __func__, __LINE__, val); /* HTC */
+		pr_info(MODULE_NAME "%s(%d) - val=0x%lx\n", __func__, __LINE__, val); /* HTC */
 
 		val = readl(base + USB_USBCMD);
 		val &= ~USB_USBCMD_RS;
