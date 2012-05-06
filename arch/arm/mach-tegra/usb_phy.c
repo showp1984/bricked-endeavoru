@@ -1712,10 +1712,10 @@ static int uhsic_phy_preresume(struct tegra_usb_phy *phy, bool is_dpd)
 
 static int uhsic_phy_postresume(struct tegra_usb_phy *phy, bool is_dpd)
 {
-	printk(KERN_INFO"%s\n", __func__);
-
 	unsigned long val;
 	void __iomem *base = phy->regs;
+
+	printk(KERN_INFO"%s\n", __func__);
 
 	pr_info(MODULE_NAME "%s\n", __func__); /* HTC */
 
