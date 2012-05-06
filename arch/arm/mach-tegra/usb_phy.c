@@ -2980,12 +2980,12 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 		val |= UHSIC_DETECT_SHORT_CONNECT;
 		writel(val, base + UHSIC_MISC_CFG0);
 		udelay(1);
-	pr_info(MODULE_NAME "%s(%d) - val=0x%x\n", __func__, __LINE__, val); /* HTC */
+		pr_info(MODULE_NAME "%s(%d) - val=0x%lx\n", __func__, __LINE__, val); /* HTC */
 
 		val = readl(base + UHSIC_MISC_CFG0);
 		val |= UHSIC_FORCE_XCVR_MODE;
 		writel(val, base + UHSIC_MISC_CFG0);
-	pr_info(MODULE_NAME "%s(%d) - val=0x%x\n", __func__, __LINE__, val); /* HTC */
+		pr_info(MODULE_NAME "%s(%d) - val=0x%lx\n", __func__, __LINE__, val); /* HTC */
 
 		val = readl(base + UHSIC_PADS_CFG1);
 		val &= ~UHSIC_RPD_STROBE;
@@ -2993,7 +2993,7 @@ int tegra_usb_phy_bus_connect(struct tegra_usb_phy *phy)
 		val |= UHSIC_RPU_STROBE;
 #endif
 		writel(val, base + UHSIC_PADS_CFG1);
-	pr_info(MODULE_NAME "%s(%d) - val=0x%x\n", __func__, __LINE__, val); /* HTC */
+		pr_info(MODULE_NAME "%s(%d) - val=0x%lx\n", __func__, __LINE__, val); /* HTC */
 
 		if (uhsic_config->usb_phy_ready &&
 					uhsic_config->usb_phy_ready())
