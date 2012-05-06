@@ -114,7 +114,7 @@ void (*arch_reset)(char mode, const char *cmd) = tegra_assert_system_reset;
 extern unsigned reboot_battery_first_level;
 
 unsigned (*get_battery_level_cb)(void) = NULL;
-EXPORT_SYMBAL_GPL(get_battery_level_cb);
+EXPORT_SYMBOL_GPL(get_battery_level_cb);
 
 #define NEVER_RESET 0
 
