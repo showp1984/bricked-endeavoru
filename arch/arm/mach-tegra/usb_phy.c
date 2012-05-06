@@ -1356,7 +1356,7 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy, bool is_dpd)
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
 static void utmip_setup_pmc_wake_detect(struct tegra_usb_phy *phy)
 {
-	unsigned long val, pmc_pad_cfg_val;
+	unsigned long val;
 	void __iomem *pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
 	unsigned  int inst = phy->instance;
 	void __iomem *base = phy->regs;
@@ -1441,12 +1441,12 @@ static void utmip_setup_pmc_wake_detect(struct tegra_usb_phy *phy)
 
 
 	/* Capture FS/LS pad configurations */
-	pmc_pad_cfg_val = readl(pmc_base + PMC_PAD_CFG);
+	(void)readl(pmc_base + PMC_PAD_CFG);
 	val = readl(pmc_base + PMC_TRIGGERS);
 	val |= UTMIP_CAP_CFG(inst);
 	writel(val, pmc_base + PMC_TRIGGERS);
 	udelay(1);
-	pmc_pad_cfg_val = readl(pmc_base + PMC_PAD_CFG);
+	(void)readl(pmc_base + PMC_PAD_CFG);
 
 	/* BIAS MASTER_ENABLE=0 */
 	val = readl(pmc_base + PMC_UTMIP_BIAS_MASTER_CNTRL);
