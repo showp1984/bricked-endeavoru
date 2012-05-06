@@ -200,7 +200,7 @@ EXPORT_SYMBOL(pm_debug_dvfs);
 #include <linux/time.h>
 #include <linux/rtc.h>
 #include <mach/board_htc.h>
-extern void htc_print_active_wake_locks();
+extern void htc_print_active_wake_locks(void);
 /*
  * The idle thread, has rather strange semantics for calling pm_idle,
  * but this is what x86 does and we need to do the same, so that
