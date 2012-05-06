@@ -289,8 +289,6 @@ void tegra_init_cache(bool init)
 #ifdef CONFIG_CACHE_L2X0
 	void __iomem *p = IO_ADDRESS(TEGRA_ARM_PERIF_BASE) + 0x3000;
 	u32 aux_ctrl;
-	u32 speedo;
-	u32 tmp;
 
 #ifdef CONFIG_TRUSTED_FOUNDATIONS
 	/* issue the SMC to enable the L2 */
