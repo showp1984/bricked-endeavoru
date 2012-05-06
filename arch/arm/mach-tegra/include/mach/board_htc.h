@@ -118,7 +118,7 @@ extern unsigned long tegra_bootloader_panel_lsb;
 extern unsigned long tegra_bootloader_panel_msb;
 
 extern const int htc_get_pcbid_info(void);
-const bool is_modem_rework_phase();
+const bool is_modem_rework_phase(void);
 
 enum {
 	PROJECT_PHASE_INVALID = -2,
