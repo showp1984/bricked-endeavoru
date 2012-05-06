@@ -207,15 +207,13 @@ extern void htc_print_active_wake_locks(void);
  * things like cpuidle get called in the same way.  The only difference
  * is that we always respect 'hlt_counter' to prevent low power idle.
  */
-void cpu_idle(void)
-{
-
-    static bool bPrint_wake_lock = true;
-    struct timespec ts;
-    struct rtc_time tm;
+void cpu_idle(void) {
+	static bool bPrint_wake_lock = true;
+	struct timespec ts;
+	struct rtc_time tm;
+	u64 cur_time, last_time;
 
 	local_fiq_enable();
-	u64 cur_time, last_time;
 	last_time = cpu_clock(UINT_MAX);
 	/* endless idle loop with no priority at all */
 	while (1) {
