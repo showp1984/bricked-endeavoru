@@ -1071,7 +1071,7 @@ void __init tegra_reserve(unsigned long carveout_size, unsigned long fb_size,
 
 	if (nvdumper_reserved) {
 		if (memblock_reserve(nvdumper_reserved, NVDUMPER_RESERVED_LEN)) {
-			pr_err("Failed to reserve nvdumper page %08lx@%08lx\n",
+			pr_err("Failed to reserve nvdumper page %08lx@%08x\n",
 			       nvdumper_reserved, NVDUMPER_RESERVED_LEN);
 			nvdumper_reserved = 0;
 		}
