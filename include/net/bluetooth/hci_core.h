@@ -958,6 +958,7 @@ int mgmt_is_interleaved_discovery(struct hci_dev *hdev);
 int mgmt_read_rssi_complete(struct hci_dev *hdev, bdaddr_t* bdaddr, s8 rssi);
 /* BlueTi End */
 
+int mgmt_incomming_remote_class(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 dev_class[3]);
 
 /* HCI info for socket */
 #define hci_pi(sk) ((struct hci_pinfo *) sk)

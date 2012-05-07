@@ -349,3 +349,9 @@ struct mgmt_ev_device_blocked {
 struct mgmt_ev_device_unblocked {
 	bdaddr_t bdaddr;
 } __packed;
+
+#define MGMT_EV_REMOTE_CLASS     0x0017
+struct mgmt_ev_remote_class {
+    bdaddr_t bdaddr;
+    __u8 dev_class[3];
+} __packed;

@@ -28,6 +28,7 @@
 #include <linux/workqueue.h>
 #include <linux/gpio.h>
 #include <linux/wakelock.h>
+#include <linux/spinlock.h>
 
 struct gpio_button_data {
 	struct gpio_keys_button *button;
@@ -48,7 +49,10 @@ struct gpio_keys_drvdata {
 };
 
 struct wake_lock power_key_wake_lock;
-
+extern int resume_from_deep_suspend;
+bool doCheck;
+bool resumeSentPwr;
+DEFINE_SPINLOCK(lock);
 /*
  * SYSFS interface for enabling/disabling keys and switches:
  *
@@ -329,13 +333,37 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
 
+	spin_lock(&lock);
+	if(!doCheck) {
+		doCheck = true;
+	spin_unlock(&lock);
+		if (resume_from_deep_suspend && (KEY_POWER == button->code) && state == 0) {
+			input_event(input, type, button->code, 1);
+			pr_info("[KEY] send power key code 1.\n");
+			//workaround for isr lost. Send down key code to input subsystem; but it has make down,down,up patten case for normal isr.
+		}
+	} else
+		spin_unlock(&lock);
+
 	if ((KEY_POWER == button->code) && (0 == state)) {
 		printk(KERN_INFO "[KEY] Power key released\n");
 	}
 
-	input_event(input, type, button->code, !!state);
-	input_sync(input);
-	printk(KERN_INFO "[KEY] Power key status, key code = %d, state = %d\n", button->code, state);
+	if ((KEY_POWER != button->code)) {
+		input_event(input, type, button->code, !!state);
+		input_sync(input);
+	} else {
+		spin_lock(&lock);
+		if( resumeSentPwr ){
+			resumeSentPwr = false;
+			spin_unlock(&lock);
+		} else {
+			spin_unlock(&lock);
+			input_event(input, type, button->code, !!state);
+			input_sync(input);
+		}
+	}
+	printk(KERN_INFO "[KEY] GPIO key status, key code = %d, state = %d\n", button->code, state);
 }
 
 static void gpio_keys_work_func(struct work_struct *work)
@@ -453,6 +481,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	struct input_dev *input;
 	int i, error;
 	int wakeup = 0;
+	doCheck = true;
 
 	ddata = kzalloc(sizeof(struct gpio_keys_drvdata) +
 			pdata->nbuttons * sizeof(struct gpio_button_data),
@@ -527,6 +556,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 
 	device_init_wakeup(&pdev->dev, wakeup);
 	wake_lock_init(&power_key_wake_lock, WAKE_LOCK_SUSPEND, "power_key_wake_lock");
+	pr_info("[KEY] gpio_keys_probe end.\n");
 
 	return 0;
 
@@ -591,7 +621,8 @@ static int gpio_keys_suspend(struct device *dev)
 			}
 		}
 	}
-
+	doCheck = false;
+	resumeSentPwr = false;
 	return 0;
 }
 
@@ -612,19 +643,22 @@ static int gpio_keys_resume(struct device *dev)
 		if (button->wakeup && device_may_wakeup(&pdev->dev)) {
 			int irq = gpio_to_irq(button->gpio);
 			disable_irq_wake(irq);
-
-			if (wakeup_key == button->code) {
+			spin_lock(&lock);
+			if (wakeup_key == button->code && !doCheck) {
 				unsigned int type = button->type ?: EV_KEY;
-
+				doCheck = true;
+				resumeSentPwr = true;
+				spin_unlock(&lock);
 				input_event(ddata->input, type, button->code, 1);
 				input_event(ddata->input, type, button->code, 0);
 				input_sync(ddata->input);
 				pr_info("[KEY] Wakup source is power key, send key code.\n");
 				wake_lock_timeout(&power_key_wake_lock, 5 * HZ);
-			}
+			} else
+				spin_unlock(&lock);
 		}
-
-		gpio_keys_report_event(&ddata->data[i]);
+		if (KEY_POWER != button->code)
+			gpio_keys_report_event(&ddata->data[i]);
 	}
 	input_sync(ddata->input);
 

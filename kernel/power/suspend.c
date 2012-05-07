@@ -141,7 +141,6 @@ static int suspend_enter(suspend_state_t state)
 {
 	int error;
 
-	resume_from_deep_suspend = 0;
 	if (suspend_ops->prepare) {
 		error = suspend_ops->prepare();
 		if (error)
@@ -302,6 +301,7 @@ int enter_state(suspend_state_t state)
 	if (!mutex_trylock(&pm_mutex))
 		return -EBUSY;
 
+	resume_from_deep_suspend = 0;
 	printk(KERN_INFO "PM: Syncing filesystems ... ");
 	sys_sync();
 	printk("done.\n");

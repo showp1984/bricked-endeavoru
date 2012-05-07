@@ -27,11 +27,11 @@
 #define BASEBAND_USB_CHR_DEV_MAJOR		66
 
 #ifndef USB_CHR_RX_BUFSIZ
-#define USB_CHR_RX_BUFSIZ			(128*1024)
+#define USB_CHR_RX_BUFSIZ			(32*1024)
 #endif  /* USB_CHR_RX_BUFSIZ */
 
 #ifndef USB_CHR_TX_BUFSIZ
-#define USB_CHR_TX_BUFSIZ			(128*1024)
+#define USB_CHR_TX_BUFSIZ			(32*1024)
 #endif  /* USB_CHR_TX_BUFSIZ */
 
 #ifndef USB_CHR_TIMEOUT

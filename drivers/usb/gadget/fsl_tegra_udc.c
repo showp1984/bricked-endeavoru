@@ -12,7 +12,7 @@
 #include <linux/err.h>
 #include <linux/io.h>
 #include <mach/usb_phy.h>
-
+#include <mach/board_htc.h>
 static struct tegra_usb_phy *phy;
 static struct clk *udc_clk;
 static struct clk *emc_clk;
@@ -42,7 +42,11 @@ int fsl_udc_clk_init(struct platform_device *pdev)
 		goto err_sclk;
 	}
 
-	clk_set_rate(sclk_clk, 80000000);
+	//clk_set_rate(sclk_clk, 80000000);
+	if(board_mfg_mode() == 0)/* normal mode */
+		clk_set_rate(sclk_clk, 240000000);
+	else
+		clk_set_rate(sclk_clk, 80000000);
 	clk_enable(sclk_clk);
 
 	emc_clk = clk_get(&pdev->dev, "emc");
@@ -58,7 +62,11 @@ int fsl_udc_clk_init(struct platform_device *pdev)
 	clk_set_rate(emc_clk, 300000000);
 #else
 	/* Set DDR busy hints to 100MHz. For Tegra 3x SOC DDR rate equals to EMC rate */
-	clk_set_rate(emc_clk, 100000000);
+	//clk_set_rate(emc_clk, 100000000);
+	if(board_mfg_mode() == 0)/* normal mode */
+		clk_set_rate(emc_clk, 533000000);
+	else
+		clk_set_rate(emc_clk, 100000000);
 #endif
 
 	/* we have to remap the registers ourselves as fsl_udc does not
@@ -150,6 +158,19 @@ void fsl_udc_clk_disable(void)
 {
 	clk_disable(udc_clk);
 }
+
+void fsl_udc_clk_pull_high(bool pull_high)
+{
+	if (pull_high) {
+		clk_set_rate(sclk_clk, 240000000);;
+		clk_set_rate(emc_clk, 533000000);
+	}
+	else {
+		clk_set_rate(sclk_clk, 80000000);
+		clk_set_rate(emc_clk, 100000000);
+	}
+}
+EXPORT_SYMBOL(fsl_udc_clk_pull_high);
 
 bool fsl_udc_charger_detect(void)
 {

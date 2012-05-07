@@ -81,6 +81,7 @@ static int keypad_code[] = {KEY_WAKEUP, 0, 0, 0, KEY_HOME, KEY_MENU, KEY_BACK};
 static const char cand_shortname[] = "htc_cand";
 static const char htcmode_shortname[] = "htcmode";
 extern struct tegra_usb_projector_info usb_pjt_info;
+extern void fsl_udc_clk_pull_high(bool); /* workaround for stability */
 
 #ifdef CONFIG_USB_ANDROID_PROJECTOR
 static DEFINE_SPINLOCK(fb_data_lock);
@@ -1122,6 +1123,7 @@ projector_function_unbind(struct usb_configuration *c, struct usb_function *f)
 		input_free_device(dev->keypad_input);
 	}
 
+	fsl_udc_clk_pull_high(1); /* workaround for stability */
 }
 
 
@@ -1193,6 +1195,7 @@ static int projector_bind_config(struct usb_configuration *c,
 	dev->is_htcmode = 0;
 	dev->htcmode_proto = config;
 
+	fsl_udc_clk_pull_high(0); /* workaround for stability */
 	return 0;
 
 err_free_wq:

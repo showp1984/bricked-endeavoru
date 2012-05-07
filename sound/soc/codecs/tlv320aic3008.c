@@ -37,6 +37,7 @@
 #include <linux/spi-tegra.h>
 #include <../arch/arm/mach-tegra/htc_audio_power.h>
 #include <mach/board_htc.h>
+#include <linux/pm_qos_params.h>
 
 #undef LOG_TAG
 #define LOG_TAG "AUD"
@@ -59,6 +60,8 @@
 #define AUD_DBG(fmt, ...) do { } while (0)
 #endif
 
+#define AUD_CPU_FREQ_MIN 102000
+
 /* for quattro --- */
 int64_t pwr_up_time;
 int64_t drv_up_time;
@@ -75,6 +78,7 @@ static int aic3008_rx_mode;
 static int aic3008_tx_mode;
 static int aic3008_dsp_mode;
 static bool first_boot_path = false;
+static struct pm_qos_request_list aud_cpu_minfreq_req;
 
 extern struct aic3008_power *aic3008_power_ctl;
 
@@ -98,6 +102,7 @@ static const struct snd_soc_dapm_route intercon[] = { };
 static int aic3008_set_config(int config_tbl, int idx, int en);
 static void aic3008_powerdown(void);
 static void aic3008_powerup(void);
+void aic3008_votecpuminfreq(bool bflag);
 
 /*****************************************************************************/
 /* Specific SPI read/write command for AIC3008                               */
@@ -380,11 +385,7 @@ void aic3008_MicSwitch(int on)
 void aic3008_AmpSwitch(int idx, int on)
 {
 	// headset amplifier
-	if (// TX
-		idx == VOICERECORD_EMIC ||
-		idx == VIDEORECORD_EMIC ||
-		idx == VOICERECOGNITION_EMIC ||
-		// RX
+	if (// RX
 		idx == CALL_DOWNLINK_EMIC_HEADPHONE ||
 		idx == CALL_DOWNLINK_IMIC_HEADPHONE ||
 		idx == CALL_DOWNLINK_EMIC_HEADPHONE_DUALMIC ||
@@ -425,7 +426,8 @@ void aic3008_AmpSwitch(int idx, int on)
 		idx == VOIP_DOWNLINK_IMIC_SPEAKER ||
 		idx == CALL_DOWNLINK_IMIC_SPEAKER_DUALMIC_WB ||
 		idx == MFG_PLAYBACK_L_SPEAKER ||
-		idx == MFG_PLAYBACK_R_SPEAKER)
+		idx == MFG_PLAYBACK_R_SPEAKER ||
+		idx == PLAYBACK_SPK_FULLDELPX)
 	{
 		if (on)
 		{
@@ -455,6 +457,47 @@ void aic3008_AmpSwitch(int idx, int on)
 		}
 	}
 }
+bool aic3008_IsSoundPlayBack(int idx)
+{
+	if (
+		idx == PLAYBACK_HEADPHONE ||
+		idx == PLAYBACK_HEADPHONE_URBEATS ||
+		idx == PLAYBACK_HEADPHONE_SOLO ||
+		idx == PLAYBACK_SPEAKER ||
+		idx == PLAYBACK_SPEAKER_ALT ||
+		idx == PLAYBACK_SPEAKER_BEATS ||
+		idx == PLAYBACK_HEADPHONE_FULLDELPX ||
+		idx == PLAYBACK_SPK_FULLDELPX ||
+		idx == PLAYBACK_DOCK ||
+		idx == PLAYBACK_RECEIVER ||
+		idx == MFG_PLAYBACK_L_SPEAKER ||
+		idx == MFG_PLAYBACK_R_SPEAKER
+        )
+        return true;
+    else
+        return false;
+}
+void aic3008_votecpuminfreq(bool bflag)
+{
+    static bool boldCPUMinReq = false;
+    if (bflag == boldCPUMinReq)
+    {
+        return;
+    }
+    boldCPUMinReq = bflag;
+    if (bflag)
+    {
+        pm_qos_update_request(&aud_cpu_minfreq_req, (s32)AUD_CPU_FREQ_MIN);
+        AUD_INFO("VoteMinFreqS:%d", AUD_CPU_FREQ_MIN);
+    }
+    else
+    {
+        pm_qos_update_request(&aud_cpu_minfreq_req, (s32)PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
+        AUD_INFO("VoteMinFreqE:%d", PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
+    }
+
+    return;
+}
 
 void aic3008_CodecInit()
 {
@@ -482,7 +525,7 @@ void aic3008_CodecInit()
 	mdelay(300);
 	spi_write_table_parsepage(CODEC_SW_RESET, ARRAY_SIZE(CODEC_SW_RESET));
 #endif
-
+	pm_qos_add_request(&aud_cpu_minfreq_req, PM_QOS_CPU_FREQ_MIN, (s32)PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
 	aic3008_rx_mode = DOWNLINK_PATH_OFF;
 	aic3008_tx_mode = UPLINK_PATH_OFF;
 }
@@ -825,6 +868,11 @@ static void aic3008_rx_config(int mode)
 			(aic3008_downlink[mode][0].data-1));
 
 	aic3008_config(&aic3008_downlink[mode][1], aic3008_downlink[mode][0].data);
+
+    if (aic3008_IsSoundPlayBack(mode))
+        aic3008_votecpuminfreq(true);
+    else
+        aic3008_votecpuminfreq(false);
 }
 
 static void aic3008_powerdown(void)
@@ -943,7 +991,6 @@ static int aic3008_set_config(int config_tbl, int idx, int en)
 	switch (config_tbl) {
 	case AIC3008_IO_CONFIG_TX:
 		/* TX */
-		aic3008_AmpSwitch(aic3008_tx_mode, 0);
 		if(!aic3008_power_ctl->isPowerOn)
 		{
 			AUD_ERR("[TX] AIC3008 is power off now, can't do IO CONFIG TX = %d, please check this condition!!", idx);
@@ -954,7 +1001,6 @@ static int aic3008_set_config(int config_tbl, int idx, int en)
 			AUD_INFO("[TX] AIC3008_IO_CONFIG_TX: UPLINK idx = %d",idx);
 			aic3008_tx_config(idx);
 			aic3008_tx_mode = idx;
-			aic3008_AmpSwitch(idx, 1);
 		} else {
 			AUD_INFO("[TX] AIC3008_IO_CONFIG_TX: UPLINK_PATH_OFF");
 			aic3008_tx_config(UPLINK_PATH_OFF);
@@ -1053,6 +1099,30 @@ static int aic3008_set_config(int config_tbl, int idx, int en)
 		{
 			AUD_INFO("[DSP] idx = %d, BEATS_OFF!!", idx);
 			aic3008_config(BEATS_OFF, ARRAY_SIZE(BEATS_OFF)); // Decrease the gain for BEATS_EFFECT_OFF
+			break;
+		}
+		else if(idx == 55)
+		{
+			AUD_INFO("[DSP] idx = %d, disable SPK_AMP!!", idx);
+			aic3008_AmpSwitch(PLAYBACK_SPEAKER, 0);
+			break;
+		}
+		else if(idx == 56)
+		{
+			AUD_INFO("[DSP] idx = %d, enable SPK_AMP!!", idx);
+			aic3008_AmpSwitch(PLAYBACK_SPEAKER, 1);
+			break;
+		}
+		else if(idx == 57)
+		{
+			AUD_INFO("[DSP] idx = %d, disable HS_Output!!", idx);
+			aic3008_config(HS_MUTE, ARRAY_SIZE(HS_MUTE));
+			break;
+		}
+		else if(idx == 58)
+		{//Might have noise when unmute, use this carefully.
+			AUD_INFO("[DSP] idx = %d, enable HS_Output!!", idx);
+			aic3008_config(HS_UNMUTE, ARRAY_SIZE(HS_UNMUTE));
 			break;
 		}
 		if(!aic3008_power_ctl->isPowerOn)
@@ -1174,7 +1244,7 @@ static long aic3008_ioctl(struct file *file, unsigned int cmd,
 	unsigned char data;
 	int len= 0; /* for dump dsp length. */
 	int pcbid = 0;
-	
+
 	AUD_DBG("IOCTL command:0x%02X, argc:%ld\n", cmd, argc);
 
 	if (aic3008_uplink == NULL || aic3008_downlink == NULL || aic3008_minidsp

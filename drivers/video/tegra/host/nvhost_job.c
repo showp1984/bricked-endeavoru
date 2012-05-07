@@ -209,6 +209,12 @@ struct nvhost_job *nvhost_job_realloc(
 	int num_cmdbufs = hdr ? hdr->num_cmdbufs : 0;
 	int err = 0;
 
+	if (!oldjob) {
+		pr_err("%s(%d) Found NULL oldjob, id %d size %d pid %d\n",
+			__func__, __LINE__, clientid, job_size(hdr), current->pid);
+		goto error;
+	}
+
 	newjob = vzalloc(job_size(hdr));
 	if (!newjob)
 		goto error;
@@ -252,6 +258,7 @@ static void job_free(struct kref *ref)
 	if (job->nvmap)
 		nvmap_client_put(job->nvmap);
 	vfree(job);
+	job = NULL;
 }
 
 void nvhost_job_put(struct nvhost_job *job)

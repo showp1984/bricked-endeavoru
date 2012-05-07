@@ -36,8 +36,6 @@
 #include <asm/setup.h>
 #include <linux/wakelock.h>
 #include <linux/jiffies.h>
-#include <linux/notifier.h>
-#include <linux/suspend.h>
 #include "../../../arch/arm/mach-tegra/board.h"
 
 #define debug_flag 0
@@ -70,8 +68,13 @@ static uint8_t sensor_chipId[3] = {0};
 static void report_near_do_work(struct work_struct *w);
 static DECLARE_DELAYED_WORK(report_near_work, report_near_do_work);
 
-static void report_debounce_do_work(struct work_struct *w);
-static DECLARE_DELAYED_WORK(report_debounce_work, report_debounce_do_work);
+//static void report_debounce_do_work(struct work_struct *w);
+//static DECLARE_DELAYED_WORK(report_debounce_work, report_debounce_do_work, status_val);
+struct ps_debounce_struct {
+    int status_val;
+    struct delayed_work report_debounce_work;
+};
+
 
 struct cm3629_info {
 	struct class *cm3629_class;
@@ -84,6 +87,7 @@ struct cm3629_info {
 	struct early_suspend early_suspend;
 	struct i2c_client *i2c_client;
 	struct workqueue_struct *lp_wq;
+	struct ps_debounce_struct ps_debounce_work;
 
 	int model;
 
@@ -153,7 +157,8 @@ static uint8_t ps2_offset_adc;
 static struct cm3629_info *lp_info;
 int enable_cm3629_log;
 int f_cm3629_level = -1;
-static struct mutex als_enable_mutex, als_disable_mutex, als_get_adc_mutex;
+static struct mutex als_enable_mutex, als_disable_mutex, als_flag_mutex, 
+					als_get_adc_mutex, ps_report_input_mutex;
 static int lightsensor_enable(struct cm3629_info *lpi);
 static int lightsensor_disable(struct cm3629_info *lpi);
 static void psensor_initial_cmd(struct cm3629_info *lpi);
@@ -520,29 +525,35 @@ static void report_near_do_work(struct work_struct *w)
 	blocking_notifier_call_chain(&psensor_notifier_list, 2, NULL);
 }
 
-static int prestatus = 1;
-static int nowstatus = 1;
-static int curstatus = 1;
+static int laststatus = 1;
 static unsigned long last_jiffies;
 static unsigned long period_jiffies = 0.35 * HZ;
-static void report_p_input()
+/* 1. nowstatus need to be local variable in report_psensor_input_event()
+	 and pass to report_p_input()
+    2. Add mutex to arround report_p_input()
+    3. enable_irq and unlock need to be set in report_p_input when prestatus == curstatus*/
+static void report_p_input(int nowstatus)
 {
+	mutex_lock(&ps_report_input_mutex);
 	struct cm3629_info *lpi = lp_info;
-	curstatus = nowstatus;
-
-	if(prestatus != curstatus) {
-		D("[PS][cm3629]  %s: report proximity status : %s\n", __func__, curstatus ? "FAR" : "NEAR");
-		input_report_abs(lpi->ps_input_dev, ABS_DISTANCE, curstatus);
+	
+	if(laststatus != nowstatus) {
+		D("[PS][cm3629]  %s: report proximity status : %s\n", __func__, nowstatus ? "FAR" : "NEAR");
+		input_report_abs(lpi->ps_input_dev, ABS_DISTANCE, nowstatus);
 		input_sync(lpi->ps_input_dev);
-		blocking_notifier_call_chain(&psensor_notifier_list, curstatus+2, NULL);
+		blocking_notifier_call_chain(&psensor_notifier_list, nowstatus+2, NULL);
 	}
 
-	prestatus = nowstatus;
+	laststatus = nowstatus;
+	mutex_unlock(&ps_report_input_mutex);
 }
 
 static void report_debounce_do_work(struct work_struct *w)
 {
-	report_p_input();
+	struct ps_debounce_struct *ps_debounce = container_of(w,
+				struct ps_debounce_struct, report_debounce_work);
+	int nowstatus = ps_debounce->status_val;
+	report_p_input(nowstatus);
 }
 
 static void report_psensor_input_event(struct cm3629_info *lpi, int interrupt_flag)
@@ -601,7 +612,6 @@ static void report_psensor_input_event(struct cm3629_info *lpi, int interrupt_fl
 
 	D("[PS][cm3629] proximity ps_adc=%d\n", ps_adc);
 
-	nowstatus = val;
 	if ((lpi->enable_polling_ignore == 1) && (val == 0) &&
 		(lpi->mfg_mode != NO_IGNORE_BOOT_MODE) &&
 		(time_before(lpi->j_end, (lpi->j_start + NEAR_DELAY_TIME)))) {
@@ -609,15 +619,16 @@ static void report_psensor_input_event(struct cm3629_info *lpi, int interrupt_fl
 		lpi->ps_pocket_mode = 1;
 	} else {
 		/* 0 is close, 1 is far */
-		if(curstatus == 0) {
+		if(laststatus == 0) {
 			if(time_before_eq(jiffies, last_jiffies+period_jiffies)) {
-				cancel_delayed_work(&report_debounce_work);
+				cancel_delayed_work(&(lpi->ps_debounce_work.report_debounce_work));
 				D("[PS][cm3629] remove debounce.\n");
 			}
-			queue_delayed_work(lpi->lp_wq, &report_debounce_work, period_jiffies);
+			lpi->ps_debounce_work.status_val = val;
+			queue_delayed_work(lpi->lp_wq, &(lpi->ps_debounce_work.report_debounce_work), period_jiffies);
 			last_jiffies = jiffies;
 		}else {
-			report_p_input();
+			report_p_input(val);
 		}
 	}
 }
@@ -687,7 +698,14 @@ static void report_lsensor_input_event(struct cm3629_info *lpi, bool resume)
 	}
 	input_report_abs(lpi->ls_input_dev, ABS_MISC, level);
 	input_sync(lpi->ls_input_dev);
-	enable_als_interrupt();
+
+	mutex_lock(&als_flag_mutex);
+	if (lpi->als_enable == 0)
+		D("[PS][cm3629] l-sensor is already disable intrrupt occur. ");
+	else
+		enable_als_interrupt();
+	mutex_unlock(&als_flag_mutex);
+
 	mutex_unlock(&als_get_adc_mutex);
 
 }
@@ -733,9 +751,9 @@ static void sensor_irq_do_work(struct work_struct *work)
 {
 	int retry;
 	struct cm3629_info *lpi = lp_info;
-	uint8_t cmd[3];
+	uint8_t cmd[3] = {0};
 	uint8_t add = 0;
-	
+
 	wake_lock_timeout(&(lpi->ps_wake_lock), 3*HZ);
 
 	for(retry = 0; retry < I2C_RETRY_COUNT; retry++) {
@@ -765,7 +783,9 @@ static void sensor_irq_do_work(struct work_struct *work)
 	}
 
 	enable_irq(lpi->irq);
-	wake_unlock(&(lpi->ps_wake_lock));
+	if(!((add & CM3629_PS1_IF_AWAY) || (add & CM3629_PS1_IF_CLOSE) ||
+	     (add & CM3629_PS2_IF_AWAY) || (add & CM3629_PS2_IF_CLOSE)))
+		wake_unlock(&(lpi->ps_wake_lock));
 }
 
 #ifdef POLLING_PROXIMITY
@@ -977,9 +997,7 @@ static int psensor_enable(struct cm3629_info *lpi)
 
 	/*p-sensor first jiffies setting*/
 	last_jiffies = jiffies;
-	prestatus = 1;
-	nowstatus = 1;
-	curstatus = 1;
+	laststatus = 1;
 
 	if (lpi->enable_polling_ignore == 1 &&
 		lpi->mfg_mode != NO_IGNORE_BOOT_MODE) {
@@ -1286,8 +1304,9 @@ static int lightsensor_enable(struct cm3629_info *lpi)
 			msleep(85);
 		else
 			msleep(85);
-
+		mutex_lock(&als_flag_mutex);
 		lpi->als_enable = 1;
+		mutex_unlock(&als_flag_mutex);
 		input_report_abs(lpi->ls_input_dev, ABS_MISC, -1);
 		input_sync(lpi->ls_input_dev);
 		report_lsensor_input_event(lpi, 1);
@@ -1301,7 +1320,7 @@ static int lightsensor_disable(struct cm3629_info *lpi)
 {
 	int ret = 0;
 	char cmd[3] = {0};
-	mutex_lock(&als_disable_mutex);
+	mutex_lock(&als_flag_mutex);
 
 	D("[LS][cm3629] %s\n", __func__);
 
@@ -1313,10 +1332,11 @@ static int lightsensor_disable(struct cm3629_info *lpi)
 	if (ret < 0)
 		pr_err("[LS][cm3629 error]%s: disable auto light sensor fail\n",
 			__func__);
-	else
+	else {
 		lpi->als_enable = 0;
+	}
 
-	mutex_unlock(&als_disable_mutex);
+	mutex_unlock(&als_flag_mutex);
 	return ret;
 }
 
@@ -2182,9 +2202,9 @@ static int cm3629_probe(struct i2c_client *client,
 
 	if (pdata->ls_cmd == 0) {
 		if (sensor_chipId[0] != 0x29)
-			lpi->ls_cmd  = CM3629_ALS_IT_320ms | CM3629_ALS_PERS_1;
+			lpi->ls_cmd  = CM3629_ALS_IT_320ms | CM3629_ALS_PERS_2;
 		else
-			lpi->ls_cmd  = CM3629_ALS_IT_400ms | CM3629_ALS_PERS_1;
+			lpi->ls_cmd  = CM3629_ALS_IT_400ms | CM3629_ALS_PERS_2;
 
 		pr_info("[PS][cm3629]%s: lp_info->ls_cmd = 0x%x!\n",
 			__func__, lp_info->ls_cmd);
@@ -2196,7 +2216,9 @@ static int cm3629_probe(struct i2c_client *client,
 
 	mutex_init(&als_enable_mutex);
 	mutex_init(&als_disable_mutex);
+	mutex_init(&als_flag_mutex);
 	mutex_init(&als_get_adc_mutex);
+	mutex_init(&ps_report_input_mutex);
 
 	ret = lightsensor_setup(lpi);
 	if (ret < 0) {
@@ -2226,6 +2248,7 @@ static int cm3629_probe(struct i2c_client *client,
 		ret = -ENOMEM;
 		goto err_create_singlethread_workqueue;
 	}
+	INIT_DELAYED_WORK(&(lpi->ps_debounce_work.report_debounce_work), report_debounce_do_work);
 
 	wake_lock_init(&(lpi->ps_wake_lock), WAKE_LOCK_SUSPEND, "proximity");
 
@@ -2345,7 +2368,9 @@ err_psensor_setup:
 err_lightsensor_setup:
 	mutex_destroy(&als_enable_mutex);
 	mutex_destroy(&als_disable_mutex);
+	mutex_destroy(&als_flag_mutex);
 	mutex_destroy(&als_get_adc_mutex);
+	mutex_destroy(&ps_report_input_mutex);
 err_cm3629_read_chip_id:
 err_platform_data_null:
 	kfree(lpi);

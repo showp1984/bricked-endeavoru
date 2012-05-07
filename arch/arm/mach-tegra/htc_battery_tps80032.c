@@ -111,7 +111,7 @@ static void reverse_current_func(struct work_struct *work);
 static DECLARE_DELAYED_WORK(reverse_current_struct, reverse_current_func);
 
 static int htc_batt_phone_call;
-static int htc_batt_alarm_work;
+static int is_alarm_not_work = 0;
 
 struct htc_battery_info {
 	int device_id;
@@ -143,6 +143,7 @@ struct htc_battery_info {
 #if WK_IS_CABLE_IN
 	int is_cable_in;
 #endif
+	int online;
 
 };
 static struct htc_battery_info htc_batt_info;
@@ -305,7 +306,7 @@ static void usb_status_notifier_func(int online)
 
 	CHECK_LOG();
 
-	if (online == htc_batt_info.rep.charging_source) {
+	if (online == htc_batt_info.online) {
 		BATT_LOG("%s: charger type (%u) same return.",
 			__func__, online);
 		return;
@@ -313,6 +314,7 @@ static void usb_status_notifier_func(int online)
 
 	mutex_lock(&htc_batt_info.info_lock);
 
+	htc_batt_info.online = online;
 	switch (online) {
 	case CONNECT_TYPE_USB:
 		BATT_LOG("cable USB");
@@ -360,6 +362,7 @@ static void usb_status_notifier_func(int online)
 #endif
 		break;
 	}
+	is_alarm_not_work = 0;
 	htc_batt_timer.alarm_timer_flag =
 			(unsigned int)htc_batt_info.rep.charging_source;
 
@@ -643,7 +646,7 @@ static void batt_first_timer_handler(unsigned long data)
 static void batt_check_alarm_handler(struct alarm *alarm)
 {
 	CHECK_LOG();
-	htc_batt_alarm_work = 1;
+
 	BATT_LOG("alarm handler, but do nothing.");
 	return;
 }
@@ -678,6 +681,17 @@ static void batt_work_func(struct work_struct *work)
 	htc_batt_timer.batt_alarm_status = 0;
 	batt_set_check_timer(htc_batt_timer.time_out);
 	wake_unlock(&htc_batt_timer.battery_lock);
+	if (is_alarm_not_work == 1) {
+		/* force wake lock once when charging*/
+		mutex_lock(&htc_batt_info.info_lock);
+		if (htc_batt_info.rep.charging_source != CHARGER_BATTERY) {
+			is_alarm_not_work = 2;
+			wake_lock(&htc_batt_info.vbus_wake_lock);
+		} else
+			is_alarm_not_work = 0;
+		mutex_unlock(&htc_batt_info.info_lock);
+	}
+
 	return;
 }
 
@@ -1016,13 +1030,11 @@ static int htc_battery_prepare(struct device *dev)
 	next_alarm = ktime_add(alarm_get_elapsed_realtime(), interval);
 	alarm_start_range(&htc_batt_timer.batt_check_wakeup_alarm,
 				next_alarm, ktime_add(next_alarm, slack));
-	htc_batt_alarm_work = 0;
 	target_interval_ms = xtime.tv_sec * MSEC_PER_SEC;
 	return 0;
 }
 
-int dbg_tps_showk(); /* from tps80032.c */
-static int showk_counter = 0;
+int dbg_tps_showk(void); /* from tps80032.c */
 static void htc_battery_complete(struct device *dev)
 {
 	unsigned long resume_ms;
@@ -1043,17 +1055,23 @@ static void htc_battery_complete(struct device *dev)
 	BATT_LOG("%s: total suspend time:%lu, the total passing time:%lu",
 			__func__, (resume_ms - htc_batt_timer.batt_suspend_ms),
 			htc_batt_timer.total_time_ms);
-	if (htc_batt_alarm_work == 0 && 
-		target_interval_ms != 0 && 
-		target_interval_ms + 10000 < 
+
+	/* XXX We found rtc-alarm will have chance not work.  If rtc-alarm not
+	 * work, the capacity accumulate will have error, and other security
+	 * effect.  This check will dump RTC register in kernel.  And also set
+	 * flag to keep device not to suspend.
+	 * If suspend time over target interval 20sec twice, set the flag.
+	 * Clean when cable status change.
+	 * However if resume take too long, the workaround may also happened.
+	 */
+	if (!is_alarm_not_work &&
+		target_interval_ms != 0 &&
+		target_interval_ms + 20000 <
 			(resume_ms - htc_batt_timer.batt_suspend_ms)) {
 		pr_info("[BATT] Alarm not work!!\n");
-		if (showk_counter < 2) {
-			dbg_tps_showk();
-			showk_counter++;
-		}
+		dbg_tps_showk();
+		is_alarm_not_work = 1;
 	}
-	htc_batt_alarm_work = -1;
 
 	if (htc_batt_timer.alarm_timer_flag)
 		/* 500 msecs check buffer time */
@@ -1216,6 +1234,7 @@ static int htc_battery_probe(struct platform_device *pdev)
 	htc_batt_info.is_cable_in = 0;
 	tps80031_is_cable_in = is_cable_in;
 #endif
+	htc_batt_info.online = -1;
 
 	INIT_WORK(&htc_batt_timer.batt_work, batt_work_func);
 	init_timer(&htc_batt_timer.batt_timer);

@@ -42,6 +42,18 @@ static CODEC_SPI_CMD BT_MIC_UNMUTE[] =
 	{'w', 0x48, 0x20},
 };
 
+static CODEC_SPI_CMD HS_MUTE[] =
+{
+	{'w', 0x00, 0x01},
+	{'w', 0x1B, 0x30},
+};
+
+static CODEC_SPI_CMD HS_UNMUTE[] =
+{//Might have noise when unmute, use this carefully.
+	{'w', 0x00, 0x01},
+	{'w', 0x1B, 0x33},
+};
+
 static CODEC_SPI_CMD BEATS_ON[] =
 {
 	{'w', 0x00, 0x01},

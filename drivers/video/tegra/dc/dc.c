@@ -954,7 +954,7 @@ static unsigned long tegra_dc_calc_win_bandwidth(struct tegra_dc *dc,
  * Assuming 48% efficiency: i.e. if we calculate we need 70MBps, we
  * will request 147MBps from EMC.
  */
-	ret = ret * 2 + ret / 10;
+	ret = ret * 2 + ret;
 
 	/* if overflowed */
 	if (ret > (1UL << 31))
@@ -2037,10 +2037,17 @@ static u64 tegra_dc_underflow_count(struct tegra_dc *dc, unsigned reg)
 	return ((count & 0x80000000) == 0) ? count : 10000000000ll;
 }
 
+#define UNDERFLOW_MAXLOG 10000
 static void tegra_dc_underflow_handler(struct tegra_dc *dc)
 {
 	u32 val;
 	int i;
+	static int underflow_cnt = 0;
+
+	val = tegra_dc_readl(dc, DC_DISP_DISP_MISC_CONTROL);
+	val ^= 0x2;
+	tegra_dc_writel(dc, val, DC_DISP_DISP_MISC_CONTROL);
+
 
 	dc->stats.underflows++;
 	if (dc->underflow_mask & WIN_A_UF_INT)
@@ -2053,7 +2060,13 @@ static void tegra_dc_underflow_handler(struct tegra_dc *dc)
 		dc->stats.underflows_c += tegra_dc_underflow_count(dc,
 			DC_WINBUF_CD_UFLOW_STATUS);
 
-	printk(KERN_INFO "[DISP]dc underflow - emc clock rate %d\n",dc->emc_clk_rate);
+	if (underflow_cnt < UNDERFLOW_MAXLOG) {
+		printk(KERN_ERR "[DISP] dc underflow: %llu a: %llu b: %llu c: %llu emc_rate %d UF_LINE_FLUSH 0x%8x\n",
+			dc->stats.underflows,dc->stats.underflows_a, dc->stats.underflows_b
+			, dc->stats.underflows_c, dc->emc_clk_rate,val);
+		underflow_cnt++;
+	}
+
 	/* Check for any underflow reset conditions */
 	for (i = 0; i < DC_N_WINDOWS; i++) {
 		if (dc->underflow_mask & (WIN_A_UF_INT << i)) {
@@ -2751,7 +2764,7 @@ static int tegra_dc_probe(struct nvhost_device *ndev)
 	dc->shift_clk_div = 1;
 	/* Initialize one shot work delay, it will be assigned by dsi
 	 * according to refresh rate later. */
-	dc->one_shot_delay_ms = 40;
+	dc->one_shot_delay_ms = 70;
 
 	dc->base_res = base_res;
 	dc->base = base;

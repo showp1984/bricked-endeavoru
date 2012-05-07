@@ -638,11 +638,10 @@ struct fsl_udc {
 	u32 current_limit;
 	struct work_struct charger_work; /* work for settting regulator current limit */
 
-	struct work_struct boost_cpufreq_work; /* work for boosting cpu frequency */
-
 	// start porting:
 	unsigned state;
 	unsigned flags;
+        unsigned myflags; //william: create this for ENR_U#17344
 	enum usb_connect_type connect_type;
 	struct workqueue_struct *usb_wq;
 	struct work_struct detect_work;

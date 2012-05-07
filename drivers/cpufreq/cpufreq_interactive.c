@@ -220,7 +220,7 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 static int input_dev_filter(const char* input_dev_name)
 {
 	int ret = 0;
-	if (strstr(input_dev_name, "synaptics-rmi-touchscreen") ||
+	if (strstr(input_dev_name, "touchscreen") ||
 		strstr(input_dev_name, "-keypad") ||
 		strstr(input_dev_name, "-nav") ||
 		strstr(input_dev_name, "-oj")) {
@@ -864,7 +864,8 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *new_policy,
 		if (rc)
 			return rc;
 
-		rc = input_register_handler(&dbs_input_handler);
+		if (!new_policy->cpu)
+			rc = input_register_handler(&dbs_input_handler);
 
 		pm_idle_old = pm_idle;
 		pm_idle = cpufreq_interactive_idle;
@@ -882,7 +883,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *new_policy,
 		 * that is trying to run.
 		 */
 		pcpu->idle_exit_time = 0;
-		input_unregister_handler(&dbs_input_handler);
+
+		if (!new_policy->cpu)
+			input_unregister_handler(&dbs_input_handler);
 
 		if (atomic_dec_return(&active_count) > 0)
 			return 0;

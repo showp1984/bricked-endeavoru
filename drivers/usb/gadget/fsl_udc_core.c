@@ -43,7 +43,6 @@
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
 #include <linux/workqueue.h>
-#include <linux/pm_qos_params.h>
 
 #include <linux/gpio.h>
 #include <asm/byteorder.h>
@@ -58,6 +57,7 @@
 #include <mach/board_htc.h>
 #include <mach/usb_phy.h>
 #include <linux/tps80032_adc.h>
+#include <mach/iomap.h>
 
 #define VOL_LEVEL_5PIN_UPPER 715
 #define VOL_LEVEL_5PIN_LOWER 585
@@ -127,6 +127,7 @@ enum charger_pin_type {
 
 #define	DMA_ADDR_INVALID	(~(dma_addr_t)0)
 #define	STATUS_BUFFER_SIZE	8
+#define USB1_PREFETCH_ID       6
 
 #ifdef CONFIG_ARCH_TEGRA
 static const char driver_name[] = "fsl-tegra-udc";
@@ -147,8 +148,6 @@ static struct usb_sys_interface *usb_sys_regs;
 #define USB_CHARGING_CURRENT_LIMIT_MA 1800
 /* 1 sec wait time for charger detection after vbus is detected */
 #define USB_CHARGER_DETECTION_WAIT_TIME_MS 1000
-#define BOOST_CPU_FREQ_MIN_KH 800000
-#define BOOST_TRIGGER_SIZE 4096
 
 static struct wake_lock udc_wake_lock;
 static struct wake_lock udc_wake_lock2;
@@ -156,10 +155,6 @@ struct wake_lock udc_resume_wake_lock;
 
 /* it is initialized in probe()  */
 struct fsl_udc *udc_controller = NULL;
-
-static struct pm_qos_request_list boost_cpu_freq_req;
-u32 ep_queue_request_count;
-u8 boost_cpufreq_work_flag;
 
 static const struct usb_endpoint_descriptor
 fsl_ep0_desc = {
@@ -322,12 +317,6 @@ static void done(struct fsl_ep *ep, struct fsl_req *req, int status)
 			req->req.actual, req->req.length);
 
 	ep->stopped = 1;
-	if (req->req.complete && req->req.length >= BOOST_TRIGGER_SIZE) {
-		//pr_err("%s: request length [%u] count[%u]", __func__, req->req.length,  ep_queue_request_count);
-		ep_queue_request_count--;
-		if (!ep_queue_request_count)
-			schedule_work(&udc->boost_cpufreq_work);
-	}
 
 	spin_unlock(&ep->udc->lock);
 	/* complete() is from gadget layer,
@@ -1066,12 +1055,6 @@ fsl_ep_queue(struct usb_ep *_ep, struct usb_request *_req, gfp_t gfp_flags)
 		is_iso = 1;
 	}
 
-	if (req->req.length >= BOOST_TRIGGER_SIZE) {
-		//pr_err("%s: request length [%u] count[%u]", __func__, req->req.length,  ep_queue_request_count);
-		ep_queue_request_count++;
-		if (ep_queue_request_count && boost_cpufreq_work_flag)
-			schedule_work(&udc->boost_cpufreq_work);
-	}
 	dir = ep_is_in(ep) ? DMA_TO_DEVICE : DMA_FROM_DEVICE;
 
 	spin_unlock_irqrestore(&udc->lock, flags);
@@ -2282,19 +2265,6 @@ static void fsl_udc_set_current_limit_work(struct work_struct* work)
 	}
 }
 
-static void fsl_udc_boost_cpu_frequency_work(struct work_struct* work)
-{
-	if (ep_queue_request_count && boost_cpufreq_work_flag) {
-		pm_qos_update_request(&boost_cpu_freq_req, (s32)BOOST_CPU_FREQ_MIN_KH);
-		/* pr_err("%s:   Boost FL[%u] count[%u]****\n", __func__, boost_cpufreq_work_flag, ep_queue_request_count);*/
-		boost_cpufreq_work_flag = 0;
-	} else if (!ep_queue_request_count && !boost_cpufreq_work_flag) {
-		pm_qos_update_request(&boost_cpu_freq_req, PM_QOS_DEFAULT_VALUE);
-		/* pr_err("%s: unBoost FL[%u] count[%u]****\n", __func__, boost_cpufreq_work_flag, ep_queue_request_count);*/
-		boost_cpufreq_work_flag = 1;
-	}
-}
-
 /*
  * If VBUS is detected and setup packet is not received in 100ms then
  * work thread starts and checks for the USB charger detection.
@@ -2372,6 +2342,12 @@ static irqreturn_t fsl_udc_irq(int irq, void *_udc)
 		spin_unlock_irqrestore(&udc->lock, flags);
 		return IRQ_NONE;
 	}
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* Fence read for coherency of AHB master intiated writes */
+	readl(IO_ADDRESS(IO_PPCS_PHYS + USB1_PREFETCH_ID));
+#endif
+
 #ifndef CONFIG_TEGRA_SILICON_PLATFORM
 	{
 		u32 temp = fsl_readl(&usb_sys_regs->vbus_sensors);
@@ -2907,6 +2883,7 @@ static void usb_do_work(struct work_struct *w)
 		spin_lock_irqsave(&udc->lock, iflags);
 		flags = udc->flags;
 		udc->flags = 0;
+                udc->myflags = 0;
 		_vbus = udc->vbus_active;
 		spin_unlock_irqrestore(&udc->lock, iflags);
 
@@ -3083,6 +3060,7 @@ void tegra_usb_set_vbus_state(int online)
 	USB_INFO("tegra_usb_set_vbus_state %s \n", online ? "on" : "off");
 	wake_lock_timeout(&udc_wake_lock2, 1*HZ);
 	usb_check_count--;
+        int count = 0;
 
 	if (udc && udc->transceiver) {
 		if (udc->vbus_active && !online) {
@@ -3128,11 +3106,27 @@ void tegra_usb_set_vbus_state(int online)
 				USB_CHARGER_DETECTION_WAIT_TIME_MS);
 
 		}
+
+		//2010/04/13 william to fix USB state machine messup due to AC plug in/out interrupt 3 times when 
+                //user plug in AC just once
+                //BUGID ENR_U#17344
+		while (udc->myflags)
+		{
+			msleep(4);
+                        if (count++ > 250)
+			{
+			    USB_INFO("BUGID ENR_U#17344 timeout\n");
+                            break;
+			}
+		}
+
 		spin_lock_irqsave(&udc->lock, flags); /* htc */
 		if (online) {
 			udc->flags |= USB_FLAG_VBUS_ONLINE;
+                        udc->myflags |= USB_FLAG_VBUS_ONLINE;
 		} else {
 			udc->flags |= USB_FLAG_VBUS_OFFLINE;
+			udc->myflags |= USB_FLAG_VBUS_OFFLINE;
 		}
 		USB_INFO("online = %s udc->flags %d \n", online ? "on" : "off", udc->flags);
 		queue_work(udc->usb_wq, &udc->detect_work);
@@ -3891,14 +3885,9 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	if (ret != 0)
 		USB_ERR("dev_attr_check_count failed\n");
 
-	boost_cpufreq_work_flag = 1;
-	ep_queue_request_count = 0;
-
 	/* create a delayed work for detecting the USB charger */
 	INIT_DELAYED_WORK(&udc_controller->work, fsl_udc_charger_detect_work);
 	INIT_WORK(&udc_controller->charger_work, fsl_udc_set_current_limit_work);
-	INIT_WORK(&udc_controller->boost_cpufreq_work, fsl_udc_boost_cpu_frequency_work);
-	pm_qos_add_request(&boost_cpu_freq_req, PM_QOS_CPU_FREQ_MIN, PM_QOS_DEFAULT_VALUE);
 
 	/* Get the regulator for drawing the vbus current in udc driver */
 	/* htc don't need this regulator
@@ -3935,6 +3924,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
 	init_timer(&udc_controller->ac_detect_timer);
 	first_online = 0;
 	usb_check_count = 0;
+        udc_controller->myflags = 0;
 	// -- htc --
 	return 0;
 
@@ -3968,8 +3958,6 @@ static int __exit fsl_udc_remove(struct platform_device *pdev)
 	udc_controller->done = &done;
 
 	cancel_delayed_work(&udc_controller->work);
-	pr_err("%s[%d]  SYNC CANCEL  ************************\n", __func__, __LINE__);
-	cancel_work_sync(&udc_controller->boost_cpufreq_work);
 	if (udc_controller->vbus_regulator)
 		regulator_put(udc_controller->vbus_regulator);
 

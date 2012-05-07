@@ -58,8 +58,6 @@
 #define CPU_HOTPLUG_TAG "[CPUHP]"
 
 static struct mutex *tegra3_cpu_lock;
-static DEFINE_MUTEX(tegra3_plug_lock);
-static DEFINE_MUTEX(tegra3_mp_lock);
 
 static struct workqueue_struct *hotplug_wq;
 static struct delayed_work hotplug_work;
@@ -228,7 +226,12 @@ static int mp_policy = 0;
 static int mp_policy_set(const char *arg, const struct kernel_param *kp)
 {
 	int ret = 0;
-	mutex_lock(&tegra3_mp_lock);
+
+	if (!tegra3_cpu_lock)
+		return ret;
+
+	mutex_lock(tegra3_cpu_lock);
+
 	ret = param_set_int(arg, kp);
 	if (ret == 0) {
 		if (mp_policy > 0) {
@@ -243,7 +246,7 @@ static int mp_policy_set(const char *arg, const struct kernel_param *kp)
 		pr_warn(CPU_HOTPLUG_TAG" %s: unable to set tegra mp_policy %s\n",
 				__func__, arg);
 
-	mutex_unlock(&tegra3_mp_lock);
+	mutex_unlock(tegra3_cpu_lock);
 	return ret;
 }
 
@@ -324,14 +327,11 @@ static void tegra_auto_hotplug_work_func(struct work_struct *work)
 	bool up = false;
 	unsigned int cpu = nr_cpu_ids;
 
-	mutex_lock(&tegra3_mp_lock);
+	mutex_lock(tegra3_cpu_lock);
 	if (mp_policy && !is_lp_cluster()) {
-		mutex_unlock(&tegra3_mp_lock);
+		mutex_unlock(tegra3_cpu_lock);
 		return;
 	}
-	mutex_unlock(&tegra3_mp_lock);
-
-	mutex_lock(tegra3_cpu_lock);
 
 	switch (hp_state) {
 	case TEGRA_HP_DISABLED:
@@ -465,9 +465,9 @@ static void tegra_auto_cpuplug_work_func(struct work_struct *work)
 		}
 	}
 
-	mutex_lock(&tegra3_plug_lock);
+	mutex_lock(tegra3_cpu_lock);
 	is_plugging = false;
-	mutex_unlock(&tegra3_plug_lock);
+	mutex_unlock(tegra3_cpu_lock);
 }
 
 static int mp_decision(void)
@@ -493,7 +493,6 @@ static int mp_decision(void)
 	rq_depth = get_rq_info();
 	nr_cpu_online = num_online_cpus();
 
-	mutex_lock(&tegra3_mp_lock);
 	if (nr_cpu_online) {
 		index = (nr_cpu_online - 1) * 2;
 		if ((nr_cpu_online < 4) && (rq_depth >= NwNs_Threshold[index])) {
@@ -510,7 +509,6 @@ static int mp_decision(void)
 	} else {
 		total_time = 0;
 	}
-	mutex_unlock(&tegra3_mp_lock);
 
 	if (new_state != TEGRA_HP_IDLE) {
 		total_time = 0;
@@ -530,12 +528,9 @@ void gcpu_plug(unsigned int cpu_freq)
 	cputime64_t current_time;
 	cputime64_t this_time = 0;
 
-	mutex_lock(&tegra3_plug_lock);
 	if (is_plugging) {
-		mutex_unlock(&tegra3_plug_lock);
 		return;
 	}
-	mutex_unlock(&tegra3_plug_lock);
 
 	current_time = ktime_to_ms(ktime_get());
 	if (first_call) {
@@ -549,7 +544,10 @@ void gcpu_plug(unsigned int cpu_freq)
 	top_freq = idle_bottom_freq;
 	bottom_freq = idle_bottom_freq;
 
-	mp_state = mp_decision();
+	if (smp_processor_id() == 0)
+		mp_state = mp_decision();
+	else
+		mp_state = TEGRA_HP_IDLE;
 
 	switch (hp_state) {
 	case TEGRA_HP_DISABLED:
@@ -582,10 +580,8 @@ void gcpu_plug(unsigned int cpu_freq)
 		/* cpu speed is up and balanced - one more on-line */
 		case TEGRA_CPU_SPEED_BALANCED:
 			if ((total_time >= up_time) && (mp_state == TEGRA_HP_UP)) {
-				mutex_lock(&tegra3_plug_lock);
 				is_plugging = true;
 				last_state = TEGRA_HP_UP;
-				mutex_unlock(&tegra3_plug_lock);
 				queue_work(cpuplug_wq, &cpuplug_work);
 				total_time = 0;
 			}
@@ -593,10 +589,8 @@ void gcpu_plug(unsigned int cpu_freq)
 		/* cpu speed is up, but skewed - remove one core */
 		case TEGRA_CPU_SPEED_SKEWED:
 			if ((total_time >= down_time) && (mp_state == TEGRA_HP_DOWN)) {
-				mutex_lock(&tegra3_plug_lock);
 				is_plugging = true;
 				last_state = TEGRA_HP_DOWN;
-				mutex_unlock(&tegra3_plug_lock);
 				queue_work(cpuplug_wq, &cpuplug_work);
 				total_time = 0;
 			}
@@ -610,10 +604,8 @@ void gcpu_plug(unsigned int cpu_freq)
 		}
 	} else if (hp_state == TEGRA_HP_DOWN) {
 		if ((total_time >= down_time) && (mp_state == TEGRA_HP_DOWN))  {
-			mutex_lock(&tegra3_plug_lock);
 			is_plugging = true;
 			last_state = TEGRA_HP_DOWN;
-			mutex_unlock(&tegra3_plug_lock);
 			queue_work(cpuplug_wq, &cpuplug_work);
 			total_time = 0;
 		}

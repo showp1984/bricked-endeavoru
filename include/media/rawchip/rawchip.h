@@ -46,6 +46,10 @@
 #include <media/rawchip/linux_rawchip.h>
 #include <media/rawchip/Yushan_API.h>
 
+struct rawchip_ctrl {
+	struct tegra_camera_rawchip_info *pdata;
+};
+
 struct rawchip_sensor_data {
 	uint8_t datatype;
 	uint8_t lane_cnt;

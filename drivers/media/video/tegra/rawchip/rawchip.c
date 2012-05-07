@@ -12,7 +12,6 @@
  */
 
 #include <media/rawchip/rawchip.h>
-#include <../../../../arch/arm/mach-tegra/gpio-names.h>
 
 #ifdef YUSHAN_API_DEBUG
 #define CDBG(fmt, args...) pr_info(fmt, ##args)
@@ -35,6 +34,9 @@ struct tegra_rawchip_device {
 	uint8_t       op_mode;
 	wait_queue_head_t wait;
 };
+
+static struct rawchip_ctrl *rawchipCtrl;
+
 static struct mutex raw_ioctl_lock;
 static struct class *tegra_rawchip_class;
 static dev_t tegra_rawchip_devno;
@@ -42,6 +44,7 @@ static struct tegra_rawchip_device *tegra_rawchip_device_p;
 
 struct platform_device *yushan_pdev;
 
+int rawchip_intr0, rawchip_intr1;
 atomic_t interrupt, interrupt2;
 struct yushan_int_t yushan_int;
 struct yushan_int_t {
@@ -88,19 +91,19 @@ static irqreturn_t yushan_irq_handler2(int irq, void *dev_id){
 
 static int yushan_create_irq(void)
 {
-	struct tegra_camera_rawchip_info *sdata = yushan_pdev->dev.platform_data;
+	struct tegra_camera_rawchip_info *pdata = rawchipCtrl->pdata;
 
 	CDBG("[CAM] yushan_create_irq");
 	//udwListOfInterrupts	= (uint32_t *) kmalloc(96, GFP_KERNEL);
-	return request_irq(TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PR0), yushan_irq_handler, IRQF_TRIGGER_RISING, "yushan_irq", 0);
+	return request_irq(TEGRA_GPIO_TO_IRQ(pdata->rawchip_intr0), yushan_irq_handler, IRQF_TRIGGER_RISING, "yushan_irq", 0);
 }
 
 static int yushan_create_irq2(void)
 {
-	struct tegra_camera_rawchip_info *sdata = yushan_pdev->dev.platform_data;
+	struct tegra_camera_rawchip_info *pdata = rawchipCtrl->pdata;
 
 	CDBG("[CAM]yushan_create_irq2");
-	return  request_irq(TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PEE1), yushan_irq_handler2, IRQF_TRIGGER_RISING, "yushan_irq2", 0);
+	return  request_irq(TEGRA_GPIO_TO_IRQ(pdata->rawchip_intr1), yushan_irq_handler2, IRQF_TRIGGER_RISING, "yushan_irq2", 0);
 }
 
 
@@ -384,20 +387,21 @@ static int rawchip_update_3a_params(struct tegra_rawchip_device *pgmn_dev, void 
 
 void rawchip_release(void)
 {
-	struct tegra_camera_rawchip_info *sdata = yushan_pdev->dev.platform_data;
+	struct tegra_camera_rawchip_info *pdata = rawchipCtrl->pdata;
 
 	pr_info("[CAM] %s\n", __func__);
 
 	//XXX Yushan_common_deinit();
 
 	CDBG("[CAM] rawchip free irq");
-	free_irq(TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PR0), 0);
-	free_irq(TEGRA_GPIO_TO_IRQ(TEGRA_GPIO_PEE1), 0);
+	free_irq(TEGRA_GPIO_TO_IRQ(pdata->rawchip_intr0), 0);
+	free_irq(TEGRA_GPIO_TO_IRQ(pdata->rawchip_intr1), 0);
 }
 
 int rawchip_open_init(void)
 {
 	int32_t rc = 0;
+	struct tegra_camera_rawchip_info *pdata = rawchipCtrl->pdata;
 
 	pr_info("[CAM] %s\n", __func__);
 
@@ -418,6 +422,8 @@ int rawchip_open_init(void)
 		pr_err("[CAM] request GPIO irq 2 error");
 
 	rawchip_init = 0;
+	rawchip_intr0 = pdata->rawchip_intr0;
+	rawchip_intr1 = pdata->rawchip_intr1;
 
 	return 0;
 }
@@ -809,8 +815,29 @@ static int __tegra_rawchip_probe(struct platform_device *pdev)
 {
 	int rc;
 	pr_info("%s\n", __func__);
+
+	rawchipCtrl = kzalloc(sizeof(struct rawchip_ctrl), GFP_ATOMIC);
+	if (!rawchipCtrl) {
+		pr_err("%s: could not allocate mem for rawchip_dev\n", __func__);
+		return -ENOMEM;
+	}
+
+	rawchipCtrl->pdata = pdev->dev.platform_data;
+	if (!rawchipCtrl->pdata) {
+		pr_err("%s: rawchip platform_data is NULL\n", __func__);
+		kfree(rawchipCtrl);
+		return -EFAULT;
+	}
+
 	yushan_pdev = pdev;
 	rc = tegra_rawchip_init(pdev);
+
+	if (rc < 0) {
+		kfree(rawchipCtrl);
+		return rc;
+	}
+
+
 	return rc;
 }
 
@@ -818,6 +845,7 @@ static int __tegra_rawchip_remove(struct platform_device *pdev)
 {
 	pr_info("%s:%d]\n", __func__, __LINE__);
 	tegra_rawchip_exit();
+	kfree(rawchipCtrl);
 	return 0;
 }
 

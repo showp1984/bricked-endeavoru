@@ -449,14 +449,13 @@ void init_mfg_serialno(void)
 	strncpy(mfg_df_serialno, serialno, strlen(serialno));
 }
 
+extern bool read_connect2pc(void);
 static ssize_t show_usb_cable_connect(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	unsigned length;
 
-	length = sprintf(buf, "%d",
-		(usb_get_connect_type() == CONNECT_TYPE_USB || usb_get_connect_type() == CONNECT_TYPE_UNKNOWN)?1:0);
-
+	length = sprintf(buf, "%d", read_connect2pc() ? 1 : 0);
 	return length;
 }
 

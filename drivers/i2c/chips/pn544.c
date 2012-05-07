@@ -351,23 +351,23 @@ static int pn544_dev_ioctl(struct inode *inode, struct file *filp,
 			I("%s power on with firmware\n", __func__);
 			pn544_Enable();
 			gpio_set_value(pni->firm_gpio, 1);
-			msleep(10);
+			msleep(50);
 			pn544_Disable();
-			msleep(10);
+			msleep(100);
 			pn544_Enable();
-			msleep(10);
+			msleep(50);
 		} else if (arg == 1) {
 			/* power on */
 			I("%s power on\n", __func__);
 			gpio_set_value(pni->firm_gpio, 0);
 			pn544_Enable();
-			msleep(10);
+			msleep(50);
 		} else  if (arg == 0) {
 			/* power off */
 			I("%s power off\n", __func__);
 			gpio_set_value(pni->firm_gpio, 0);
 			pn544_Disable();
-			msleep(10);
+			msleep(100);
 		} else {
 			E("%s bad arg %lu\n", __func__, arg);
 			goto fail;

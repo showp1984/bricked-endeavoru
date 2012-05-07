@@ -140,5 +140,8 @@ int tegra_get_modem_id(void);
 enum power_supply_type get_power_supply_type(void);
 enum audio_codec_type get_audio_codec_type(void);
 int get_maximum_cpu_current_supported(void);
+ 
+extern int dying_processors_read_proc(char *page, char **start, off_t off,
+			   int count, int *eof, void *data);
 
 #endif

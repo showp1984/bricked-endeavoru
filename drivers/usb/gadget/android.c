@@ -94,7 +94,7 @@ static const char longname[] = "Gadget Android";
 #define VENDOR_ID		0x18D1
 #define PRODUCT_ID		0x0001
 
-static bool connect2pc;//htc
+static atomic_t connect2pc = ATOMIC_INIT(false);
 
 struct android_usb_function {
 	char *name;
@@ -259,8 +259,8 @@ static void android_work(struct work_struct *data)
 #endif
 		}
 
-		if (!connect2pc && dev->connected) {
-			connect2pc = true;
+		if (!atomic_read(&connect2pc) && dev->connected) {
+			atomic_set(&connect2pc, true);
 			switch_set_state(&cdev->sw_connect2pc, 1);
 			pr_info("set usb_connect2pc = 1\n");
 		}
@@ -277,13 +277,18 @@ static void android_work(struct work_struct *data)
 		spin_unlock_irqrestore(&cdev->lock, flags);
 	}
 
-	if (connect2pc && !dev->connected) {
-		connect2pc = false;
+	if (atomic_read(&connect2pc) && !dev->connected) {
+		atomic_set(&connect2pc, false);
 		switch_set_state(&cdev->sw_connect2pc, 0);
 		pr_info("set usb_connect2pc = 0\n");
 	}
 }
 
+bool read_connect2pc(void)
+{
+	return atomic_read(&connect2pc);
+}
+EXPORT_SYMBOL(read_connect2pc);
 
 /*-------------------------------------------------------------------------*/
 /* Supported functions initialization */
@@ -2190,7 +2195,7 @@ static int __init init(void)
 	struct android_dev *dev;
 	int ret;
 
-	connect2pc = false;
+	atomic_set(&connect2pc, false);
 	android_class = class_create(THIS_MODULE, "android_usb");
 	if (IS_ERR(android_class))
 		return PTR_ERR(android_class);

@@ -2555,6 +2555,7 @@ const struct i2c_device_id *id)
     ewtzmu_i2c_client = data->client;
      gpio_set_value(data->pdata->sleep_pin, 0);
 	 ewtzmumid_data.sleep_pin = data->pdata->sleep_pin;
+    msleep(1);
     err = EWTZMU2_Chipset_Init();
     if (err < 0) {
 	E("PANA:GYRO:init err\n");

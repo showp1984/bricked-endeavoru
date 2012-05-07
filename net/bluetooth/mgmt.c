@@ -2804,3 +2804,12 @@ int mgmt_has_pending_stop_discov(struct hci_dev *hdev)
 
 	return 0;
 }
+
+int mgmt_incomming_remote_class(struct hci_dev *hdev, bdaddr_t *bdaddr, u8 dev_class[3])
+{
+	struct mgmt_ev_remote_class ev;
+	memset(&ev, 0, sizeof(ev));
+	bacpy(&ev.bdaddr, bdaddr);
+	memcpy(ev.dev_class, dev_class, 3);
+	return mgmt_event(MGMT_EV_REMOTE_CLASS, hdev, &ev, sizeof(ev), NULL);
+}

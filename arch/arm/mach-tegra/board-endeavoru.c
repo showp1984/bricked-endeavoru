@@ -81,6 +81,7 @@
 #include "pm.h"
 #include "htc-gpio.h"
 #include <mach/htc_util.h>
+#include <media/rawchip/rawchip.h>
 
 #include "pokecpu.h"
 
@@ -785,11 +786,16 @@ static struct spi_board_info enterprise_spi_board_info_rawchip[] __initdata = {
 };
 EXPORT_SYMBOL_GPL(enterprise_spi_board_info_rawchip);
 
+static struct tegra_camera_rawchip_info tegra_rawchip_board_info = {
+	.rawchip_intr0  = TEGRA_GPIO_PR0,
+	.rawchip_intr1  = TEGRA_GPIO_PEE1,
+};
+
 static struct platform_device tegra_rawchip_device = {
 	.name = "rawchip",
 	.id	= -1,
 	.dev	= {
-		.platform_data  = NULL,
+		.platform_data = &tegra_rawchip_board_info,
 	},
 };
 
@@ -2341,8 +2347,10 @@ static void __init tegra_enterprise_init(void)
 		printk(KERN_ALERT "[mtd] mount /proc/emmc failed\n");
 	}
 
-	htc_monitor_init();
-	htc_pm_monitor_init();
+	proc = create_proc_read_entry("dying_processes", 0, NULL, dying_processors_read_proc, NULL);
+	if (!proc)
+		printk(KERN_ERR"Create /proc/dying_processes FAILED!\n");
+
 	BOOT_DEBUG_LOG_LEAVE("<machine>.init_machine");
 }
 

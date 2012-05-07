@@ -183,6 +183,7 @@ MODULE_PARM_DESC(rxbyte, "rxbyte");
 static struct usb_driver acm_driver;
 static struct tty_driver *acm_tty_driver;
 static struct acm *acm_table[ACM_TTY_MINORS];
+static bool acm_ready_table[ACM_TTY_MINORS];
 
 static DEFINE_MUTEX(open_mutex);
 
@@ -902,23 +903,39 @@ static int acm_tty_open(struct tty_struct *tty, struct file *filp)
 	int i;
 	dbg("Entering acm_tty_open.");
 
-	if (!tty) {
-		pr_err("%s: tty NULL\n", __func__);
-		return -EINVAL;
-	}
-
 	mutex_lock(&open_mutex);
 
-	acm = acm_table[tty->index];
+	if (!tty) {
+		pr_err("%s: tty NULL\n", __func__);
+		goto out;
+	}
+	if (tty->index >ACM_TTY_MINORS ) {
+		pr_err("%s: tty > ACM_TTY_MINORS\n", __func__);
+		goto out;
+	}
 
-#if 1 //HTC_CSP_START
-	printk(MODULE_NAME":%s ttyACM%d +\n",__FUNCTION__,acm->minor);
-#endif //HTC_CSP_END
+	acm = acm_table[tty->index];
 
 	if (!acm || !acm->dev)
 		goto out;
 	else
 		rv = 0;
+
+#if 1 //HTC_CSP_START
+	printk(MODULE_NAME":%s ttyACM%d +\n",__FUNCTION__,acm->minor);
+#endif //HTC_CSP_END
+
+	/* Current acm implementation does not have acm->disconnected
+	   feature to know whether acm is probed. Adding a check to
+	   see if atleast ACM0 is up.
+	*/
+	for (i=0; i < MAX_ACM_NUM; i++) {
+		if (acm_ready_table[i] == false) {
+			printk("%s: acm is not ready\n", __func__);
+			rv = -ENODEV;
+		goto out;
+		}
+	}
 
 	set_bit(TTY_NO_WRITE_SPLIT, &tty->flags);
 
@@ -1466,8 +1483,13 @@ static int acm_probe(struct usb_interface *intf,
 	num_rx_buf = (quirks == SINGLE_RX_URB) ? 1 : ACM_NR;
 
 	/* not a real CDC ACM device: ignore modem boot rom */
-	if (quirks & NOT_REAL_ACM)
+	if (quirks & NOT_REAL_ACM) {
+			if (is_minor_valid(intf->cur_altsetting->desc.bInterfaceNumber))
+				acm_ready_table[intf->cur_altsetting->desc.bInterfaceNumber] = false;
+			pr_info(" 0320 quirks & NOT_REAL_ACM acm_ready_table[intf->cur_altsetting->desc.bInterfaceNumber=%d]=false\n",intf->cur_altsetting->desc.bInterfaceNumber);
 		return -ENODEV;
+		}
+
 
 	if (max_intfs == 1) {
 		/* XMM HACK - use ACM for interfaces 0/1 only */
@@ -1838,6 +1860,9 @@ skip_countries:
 	acm_table[minor] = acm;
 
 	tty_register_device(acm_tty_driver, minor, &control_interface->dev);
+	
+	printk("%s: acm_ready_table[minor=%d]=ture\n", __func__,minor);
+	acm_ready_table[minor] = true;
 
 	return 0;
 alloc_fail8:
@@ -1896,12 +1921,21 @@ static void acm_disconnect(struct usb_interface *intf)
 	struct acm *acm = usb_get_intfdata(intf);
 	struct usb_device *usb_dev = interface_to_usbdev(intf);
 	struct tty_struct *tty;
+	struct urb *res;
+
+	int i;
 #if 1 //HTC_CSP_START
-	if (acm)
-		pr_info(MODULE_NAME "%s ttyACM%d +\n", __func__, acm->minor);
-	else
-		pr_info(MODULE_NAME "%s\n", __func__);
+	if (acm){
+		pr_info(MODULE_NAME "%s ttyACM%d + {\n", __func__, acm->minor);
+		}else{
+		pr_info(MODULE_NAME "%s ttyACM + acm!=1\n", __func__);
+		}
 #endif //HTC_CSP_END
+
+	for (i=0; i < MAX_ACM_NUM; i++){
+		acm_ready_table[i] = false;
+	printk("%s: acm_ready_table[%d]=false\n", __func__, i);
+}
 
 	/* sibling interface is already cleaning up */
 	if (!acm) {
@@ -1931,7 +1965,10 @@ static void acm_disconnect(struct usb_interface *intf)
 
 	stop_data_traffic(acm);
 
-    usb_kill_anchored_urbs(&acm->deferred);
+	/* decrement ref count for anchored urbs*/
+	while ((res = usb_get_from_anchor(&acm->deferred)))
+		usb_put_urb(res);
+
 	acm_write_buffers_free(acm);
 	usb_free_coherent(usb_dev, acm->ctrlsize, acm->ctrl_buffer,
 			  acm->ctrl_dma);
@@ -1953,6 +1990,8 @@ static void acm_disconnect(struct usb_interface *intf)
 		tty_hangup(tty);
 		tty_kref_put(tty);
 	}
+	
+	pr_info(MODULE_NAME "%s ttyACM%d -}\n", __func__, acm->minor);
 }
 
 #ifdef CONFIG_PM

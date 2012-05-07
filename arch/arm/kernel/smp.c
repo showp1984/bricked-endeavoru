@@ -46,7 +46,7 @@
  * where to place its SVC stack
  */
 struct secondary_data secondary_data;
-
+#define CPU_ONLINE_FAILED_MAX          3              /* CPU online retry limit */
 enum ipi_msg_type {
 	IPI_TIMER = 2,
 	IPI_RESCHEDULE,
@@ -61,6 +61,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	struct task_struct *idle = ci->idle;
 	pgd_t *pgd;
 	int ret;
+	u8 retry = 0;
 
 	/*
 	 * Spawn a new process manually, if not already done.
@@ -114,7 +115,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	ret = boot_secondary(cpu, idle);
 	if (ret == 0) {
 		unsigned long timeout;
-
+retry_online_failed:
 		/*
 		 * CPU was successfully started, wait for it
 		 * to come online or time out.
@@ -130,6 +131,8 @@ int __cpuinit __cpu_up(unsigned int cpu)
 
 		if (!cpu_online(cpu)) {
 			pr_crit("CPU%u: failed to come online\n", cpu);
+			if (++retry < CPU_ONLINE_FAILED_MAX)
+				goto retry_online_failed;
 			ret = -EIO;
 		}
 	} else {

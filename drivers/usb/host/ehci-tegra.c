@@ -75,6 +75,10 @@
 #define UHSIC_STAT_CFG0			0xc28
 /* 84717-1 patch */
 
+#define USB1_PREFETCH_ID               6
+#define USB2_PREFETCH_ID               17
+#define USB3_PREFETCH_ID               18
+
 struct tegra_ehci_hcd {
 	struct ehci_hcd *ehci;
 	struct tegra_usb_phy *phy;
@@ -168,6 +172,16 @@ static irqreturn_t tegra_ehci_irq (struct usb_hcd *hcd)
 	struct ehci_regs __iomem *hw = ehci->regs;
 	struct tegra_ehci_hcd *tegra = dev_get_drvdata(hcd->self.controller);
 	u32 val;
+
+#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+	/* Fence read for coherency of AHB master intiated writes */
+	if (tegra->phy->instance == 0)
+		readl(IO_ADDRESS(IO_PPCS_PHYS + USB1_PREFETCH_ID));
+	else if (tegra->phy->instance == 1)
+		readl(IO_ADDRESS(IO_PPCS_PHYS + USB2_PREFETCH_ID));
+	else if (tegra->phy->instance == 2)
+		readl(IO_ADDRESS(IO_PPCS_PHYS + USB3_PREFETCH_ID));
+	#endif
 
 	if ((tegra->phy->usb_phy_type == TEGRA_USB_PHY_TYPE_UTMIP) &&
 		(tegra->ehci->has_hostpc)) {

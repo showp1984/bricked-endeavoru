@@ -32,6 +32,7 @@ struct yushan_int_t {
 
 bool_t	gPllLocked;
 
+extern int rawchip_intr0, rawchip_intr1;
 extern atomic_t interrupt, interrupt2;
 extern struct yushan_int_t yushan_int;
 Yushan_DXO_DPP_Tuning_t sDxoDppTuning;
@@ -2027,8 +2028,6 @@ uint8_t Yushan_parse_interrupt(void)
 	uint8_t	bSpiData;
 	uint32_t udwSpiBaseIndex;
 	uint8_t interrupt_type = 0;
-	uint32_t		enableIntrMask[] = {0x7DF38E3B, 0xA600007C, 0x000DBFFD};
-	uint32_t		disableIntrMask[] = {0x00000000, 0x00000000, 0x00000000};
 
 	udwListOfInterrupts	= kmalloc(96, GFP_KERNEL);
 
@@ -2036,12 +2035,8 @@ uint8_t Yushan_parse_interrupt(void)
 	/* bInterruptID = Yushan_ReadIntr_Status(); */
 	Yushan_Intr_Status_Read((uint8_t *)udwListOfInterrupts);
 
-	Yushan_Intr_Enable((uint8_t*)disableIntrMask);
-
 	/* Clear InterruptStatus */
 	Yushan_Intr_Status_Clear((uint8_t *) udwListOfInterrupts);
-
-	Yushan_Intr_Enable((uint8_t*)enableIntrMask);
 
 	/* Adding the Current Interrupt asserted to the Proto List */
 	while (bCurrentInterruptID < (TOTAL_INTERRUPT_COUNT + 1)) {
@@ -2340,6 +2335,15 @@ uint8_t Yushan_parse_interrupt(void)
 
 	kfree(udwListOfInterrupts);
 
+	if (gpio_get_value(rawchip_intr0) == 1) {
+		atomic_set(&interrupt, 1);
+		wake_up(&yushan_int.yushan_wait);
+	}
+	if (gpio_get_value(rawchip_intr1) == 1) {
+		atomic_set(&interrupt2, 1);
+		wake_up(&yushan_int.yushan_wait);
+	}
+
 	return interrupt_type;
 }
 
@@ -2362,21 +2366,14 @@ void Yushan_ISR()
 	uint8_t	bSpiData;
 	uint32_t udwSpiBaseIndex;
 
-	uint32_t		enableIntrMask[] = {0x7DF38E3B, 0xA600007C, 0x000DBFFD};
-	uint32_t		disableIntrMask[] = {0x00000000, 0x00000000, 0x00000000};
-
 	udwListOfInterrupts	= (uint32_t *) kmalloc(96, GFP_KERNEL);
 
 	/* Call Yushan_Intr_Status_Read  for interrupts and add the same to the udwListOfInterrupts. */
 	/* bInterruptID = Yushan_ReadIntr_Status(); */
 	Yushan_Intr_Status_Read ((uint8_t *)udwListOfInterrupts);
 
-	Yushan_Intr_Enable((uint8_t*)disableIntrMask);
-
 	/* Clear InterruptStatus */
 	Yushan_Intr_Status_Clear((uint8_t *) udwListOfInterrupts);
-
-	Yushan_Intr_Enable((uint8_t*)enableIntrMask);
 
 	/* Adding the Current Interrupt asserted to the Proto List */
 	while (bCurrentInterruptID < (TOTAL_INTERRUPT_COUNT + 1))
@@ -2581,6 +2578,15 @@ void Yushan_ISR()
 	}
 
 	kfree(udwListOfInterrupts);
+
+	if (gpio_get_value(rawchip_intr0) == 1) {
+		atomic_set(&interrupt, 1);
+		wake_up(&yushan_int.yushan_wait);
+	}
+	if (gpio_get_value(rawchip_intr1) == 1) {
+		atomic_set(&interrupt2, 1);
+		wake_up(&yushan_int.yushan_wait);
+	}
 }
 
 void Yushan_ISR2() /* for DOP7 */
@@ -3636,7 +3642,7 @@ bool_t Yushan_Read_AF_Statistics(uint32_t  *sYushanAFStats)
 	while(bCount<bNumOfActiveRoi)
 	{
 		/* Reading the stats from the DXO registers. */
-		bStatus &= SPI_Read((uint16_t)(DXO_DOP_BASE_ADDR + DxODOP_ROI_0_stats_G_7_0 + bCount*16), 16, (uint8_t *)(&udwSpiData[0]));
+		bStatus &= SPI_Read(DXO_DOP_BASE_ADDR + DxODOP_ROI_0_stats_G_7_0 + bCount*16, 16, (uint8_t *)(&udwSpiData[0]));
 		/* Copying the stats to the AF Stats struct */
 		*pLocalAFStats	= udwSpiData[0];
 		*(pLocalAFStats + 1) = udwSpiData[1];

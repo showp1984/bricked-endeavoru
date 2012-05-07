@@ -39,8 +39,15 @@ static DECLARE_DELAYED_WORK(detect_gpio_work, detect_gpio_work_func);
 static struct workqueue_struct *button_wq;
 static void button_gpio_work_func(struct work_struct *work);
 static DECLARE_DELAYED_WORK(button_gpio_work, button_gpio_work_func);
+static void hs_key_irq_enable_func(struct work_struct *work);
+static DECLARE_DELAYED_WORK(hs_key_irq_enable, hs_key_irq_enable_func);
+static void cancel_button_work_func(struct work_struct *work);
+static DECLARE_DELAYED_WORK(cancel_button_work, cancel_button_work_func);
 
 static struct htc_headset_gpio_info *hi;
+unsigned long last_key_jiffies = 0;
+unsigned long unstable_jiffies = 0.02 * HZ;
+unsigned long irq_delay = 0.002 * HZ;
 
 static int hs_gpio_hpin_state(void)
 {
@@ -100,17 +107,38 @@ static void button_gpio_work_func(struct work_struct *work)
 	hs_notify_key_irq();
 }
 
+static void hs_key_irq_enable_func(struct work_struct *work)
+{
+	HS_DBG();
+	enable_irq(hi->key_irq);
+}
+
+static void cancel_button_work_func(struct work_struct *work)
+{
+	HS_DBG();
+	cancel_delayed_work(&button_gpio_work);
+}
+
 static irqreturn_t button_irq_handler(int irq, void *dev_id)
 {
 	unsigned int irq_mask = IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW;
 
 	HS_DBG();
 
+	if(time_before_eq(jiffies, last_key_jiffies+unstable_jiffies) && last_key_jiffies != 0) {
+		queue_delayed_work(button_wq, &cancel_button_work, HS_JIFFIES_ZERO);
+		HS_LOG("The KEY event is unstable,remove debounce.");
+	}
+
+	disable_irq_nosync(hi->key_irq);
+	queue_delayed_work(button_wq, &hs_key_irq_enable, irq_delay);
+
 	hi->key_irq_type ^= irq_mask;
 	irq_set_irq_type(hi->key_irq, hi->key_irq_type);
 
 	wake_lock_timeout(&hi->hs_wake_lock, HS_WAKE_LOCK_TIMEOUT);
-	queue_delayed_work(button_wq, &button_gpio_work, HS_JIFFIES_ZERO);
+	queue_delayed_work(button_wq, &button_gpio_work, unstable_jiffies);
+	last_key_jiffies = jiffies;
 
 	return IRQ_HANDLED;
 }
@@ -215,8 +243,8 @@ static void detect_gpio_work_func(struct work_struct *work)
 	hi->headset_state = insert;
 	hs_notify_plug_event(insert);
 
-	if (hi->pdata.key_gpio)
-		if (hi->headset_state == 1 && !hi->key_irq){
+	if (hi->pdata.key_gpio){
+		if(!hi->key_irq){
 			ret = gpio_to_irq(hi->pdata.key_gpio);
 			if (ret < 0)
 				HS_ERR("gpio_to_irq");
@@ -226,13 +254,23 @@ static void detect_gpio_work_func(struct work_struct *work)
 				hi->key_irq_type, "HS_GPIO_BUTTON", NULL);
 			if (ret < 0)
 				HS_ERR("request irq error;");
+			disable_irq_nosync(hi->key_irq);
+		}
 
-			ret = irq_set_irq_wake(hi->key_irq, 1);
-			if (ret < 0) {
-				HS_ERR("set irq wake error");
-				free_irq(hi->key_irq, 0);
+		if (hi->key_irq){
+			if (hi->headset_state == 1){
+				ret = irq_set_irq_wake(hi->key_irq, 1);
+				if (ret < 0)
+					HS_ERR("set irq wake error");
+				enable_irq(hi->key_irq);
+			}else{
+				ret = irq_set_irq_wake(hi->key_irq, 0);
+				if (ret < 0)
+					HS_ERR("set irq wake error");
+				disable_irq_nosync(hi->key_irq);
 			}
 		}
+	}
 }
 
 static void hs_gpio_register(void)

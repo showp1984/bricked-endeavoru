@@ -90,7 +90,7 @@ unsigned int set_rq_poll_ms(unsigned int poll_ms)
 	if (poll_ms <= 0)
 		cancel_delayed_work(&rq_info.rq_work);
 	else
-		queue_delayed_work(rq_wq, &rq_info.rq_work,
+		queue_delayed_work_on(0, rq_wq, &rq_info.rq_work,
 				msecs_to_jiffies(poll_ms));
 
 	mutex_unlock(&lock_poll_ms);
@@ -141,7 +141,7 @@ static void rq_work_fn(struct work_struct *work)
 
 	/* Set the next poll */
 	if (rq_info.rq_poll_ms)
-		queue_delayed_work(rq_wq, &rq_info.rq_work,
+		queue_delayed_work_on(0, rq_wq, &rq_info.rq_work,
 			msecs_to_jiffies(rq_info.rq_poll_ms));
 
 	rq_info.total_time += time_diff;
@@ -210,7 +210,7 @@ static ssize_t store_run_queue_poll_ms(struct kobject *kobj,
 	if (val <= 0)
 		cancel_delayed_work(&rq_info.rq_work);
 	else
-		queue_delayed_work(rq_wq, &rq_info.rq_work,
+		queue_delayed_work_on(0, rq_wq, &rq_info.rq_work,
 				msecs_to_jiffies(val));
 
 	mutex_unlock(&lock_poll_ms);
