@@ -2728,7 +2728,7 @@ static void __devinit check_msi(struct azx *chip)
 }
 
 #ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
-static const char *tegra_clk_names[] __initdata = {
+static const char *tegra_clk_names[] __devinitdata = {
 	"hda",
 	"hda2codec",
 	"hda2hdmi",
@@ -3246,7 +3246,7 @@ static const struct platform_device_id azx_platform_ids[] = {
 MODULE_DEVICE_TABLE(platform, azx_platform_ids);
 
 /* platform_driver definition */
-static struct platform_driver driver_platform = {
+static struct platform_driver driver_platform __refdata = {
 	.driver = {
 		.name = "hda-platform"
 	},
