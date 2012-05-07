@@ -774,7 +774,7 @@ static struct tegra_spi_device_controller_data dev_cdata_rawchip = {
        .cs_setup_clk_count = 1, /* int cs_setup_clk_count */
        .cs_hold_clk_count = 2, /* int cs_hold_clk_count */
 };
-static struct spi_board_info enterprise_spi_board_info_rawchip[] __initdata = {
+static struct spi_board_info enterprise_spi_board_info_rawchip[] = {
        {
                .modalias       = "spi_rawchip",
                .mode           = SPI_MODE_0,
