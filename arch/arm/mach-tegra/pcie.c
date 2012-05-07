@@ -1176,7 +1176,7 @@ static void __init tegra_pcie_add_port(int index, u32 offset, u32 reset_reg)
 	memset(pp->res, 0, sizeof(pp->res));
 }
 
-static int tegra_pcie_init(void)
+static int __init tegra_pcie_init(void)
 {
 	int err = 0;
 	int port;
