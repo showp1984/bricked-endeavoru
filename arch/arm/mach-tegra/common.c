@@ -1203,6 +1203,8 @@ static void cpufreq_read_governor_param(char *param_path, char *name, char *valu
 
 	/* change to KERNEL_DS address limit */
 	old_fs = get_fs();
+	if (!old_fs)
+		return;
 	set_fs(KERNEL_DS);
 
 	sprintf(buf, CPUFREQ_GOV_PARAM, param_path, name);
