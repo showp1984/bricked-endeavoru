@@ -1,5 +1,6 @@
 ifdef CONFIG_WL12XX
-obj-$(CONFIG_MAC80211) += mac80211.o
+#We will build mac80211.ko at vendor/ti/wlan/
+#obj-$(CONFIG_MAC80211) += mac80211.o
 else
 obj-$(CONFIG_MAC80211) += mac80211.o
 endif
