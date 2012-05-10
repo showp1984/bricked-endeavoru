@@ -6,10 +6,10 @@ wl12xx_sdio-objs	= sdio.o
 wl12xx_sdio_test-objs = sdio_test.o
 
 wl12xx-$(CONFIG_NL80211_TESTMODE)	+= testmode.o
-#We will build wl12xx.ko and wl12xx_sdio.ko at vendor/ti/wlan/
-#obj-$(CONFIG_WL12XX)			+= wl12xx.o
+
+obj-$(CONFIG_WL12XX)			+= wl12xx.o
 obj-$(CONFIG_WL12XX_SPI)		+= wl12xx_spi.o
-#obj-$(CONFIG_WL12XX_SDIO)		+= wl12xx_sdio.o
+obj-$(CONFIG_WL12XX_SDIO)		+= wl12xx_sdio.o
 
 obj-$(CONFIG_WL12XX_SDIO_TEST)	+= wl12xx_sdio_test.o
 
