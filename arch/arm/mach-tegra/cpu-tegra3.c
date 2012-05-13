@@ -457,13 +457,24 @@ static void tegra_auto_cpuplug_work_func(struct work_struct *work)
 				}
 			} else if (!is_lp_cluster() && !no_lp) {
 
-				/* Invalid request, why put sth down that is not there?
-				   This would cause a NULL pointer dereference in
-				   arch/arm/mach-tegra/clock.c: clk_set_parent & clk_get_rate
-				   show-p1984, 05.08.12 (MM/DD/YY)
+				/* For some reason this sometimes results in a null
+				   pointer dereference. Set the clocks again if this
+				   case occurs.
+				   start show-p1984, 2012.05.13
 				 */
-				if (!cpu_clk || !cpu_lp_clk)
+				if (!cpu_clk) {
+					printk(KERN_INFO "[cpu-tegra3]: re setting cpu_clk");
+					cpu_clk = clk_get_sys(NULL, "cpu");
+				}
+				if (!cpu_lp_clk) {
+					printk(KERN_INFO "[cpu-tegra3]: re setting cpu_lp_clk");
+					cpu_lp_clk = clk_get_sys(NULL, "cpu_lp");
+				}
+				if (IS_ERR(cpu_clk) || IS_ERR(cpu_lp_clk)) {
+					printk(KERN_INFO "[cpu-tegra3]: Error, cpu_clk/cpu_lp_lck not set");
 					break;
+				}
+				/* end show-p1984, 2012.05.13 */
 
 				if (!clk_set_parent(cpu_clk, cpu_lp_clk)) {
 					CPU_DEBUG_PRINTK(CPU_DEBUG_HOTPLUG, " ENTER LPCPU");
