@@ -2653,12 +2653,12 @@ static int synaptics_ts_resume(struct i2c_client *client)
 
 	printk(KERN_INFO "[TP] %s: enter\n", __func__);
 
+	if (ts->power)
+		ts->power(11);
+
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
 	if (s2w_switch == 0) {
 #endif
-		if (ts->power)
-			ts->power(11);
-
 #ifdef SYN_SUSPEND_RESUME_POWEROFF
 		if (ts->power) {
 			ts->power(1);
