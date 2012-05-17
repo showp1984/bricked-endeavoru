@@ -2643,7 +2643,7 @@ static int synaptics_ts_resume(struct i2c_client *client)
 			get_address_base(ts, 0x01, CONTROL_BASE), 0x01); /* sleep */
 		if (ret < 0)
 			i2c_syn_error_handler(ts, 1, "sleep", __func__);
-		msleep(100);
+		msleep(150);
 		ret = 0;
 		//screen on, disable_irq_wake
 		scr_suspended = false;
