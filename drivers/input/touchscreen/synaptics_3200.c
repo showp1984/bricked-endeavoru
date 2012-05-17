@@ -2570,6 +2570,7 @@ static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 	if (s2w_switch == 0) {
 		if (ret && ts->use_irq) /* if work was pending disable-count is now 2 */
 			enable_irq(client->irq);
+	}
 #endif
 
 	ts->pre_finger_data[0][0] = 0;
@@ -2601,10 +2602,11 @@ static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 		i2c_syn_error_handler(ts, 0, "w:0", __func__);
         printk("[TP] disable palm supression\n");
 */
-#ifdef SYN_SUSPEND_RESUME_POWEROFF
 #ifdef CONFIG_TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
 	if (s2w_switch == 0) {
 #endif
+
+#ifdef SYN_SUSPEND_RESUME_POWEROFF
 		if (ts->power)
 			ts->power(0);
 		else 
