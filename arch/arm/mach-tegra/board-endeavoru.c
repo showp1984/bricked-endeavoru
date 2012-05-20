@@ -83,8 +83,6 @@
 #include <mach/htc_util.h>
 #include <media/rawchip/rawchip.h>
 
-#include "pokecpu.h"
-
 #include "touch.h"
 #ifdef CONFIG_TEGRA_HAPTIC2
 #include <linux/pm8xxx-haptic2.h>
