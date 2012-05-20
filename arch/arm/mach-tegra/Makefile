@@ -289,6 +289,5 @@ obj-${CONFIG_MACH_ERAU}               += nand_partitions.o
 # Add ramdump from NV patches
 obj-y                                   += nvdumper.o
 obj-y 					+= htc_util.o
-obj-y 					+= pokecpu.o
 
 obj-y                                   += tegra_rq_stats.o
