@@ -80,7 +80,6 @@
 #include "wakeups-t3.h"
 #include "pm.h"
 #include "htc-gpio.h"
-#include <mach/htc_util.h>
 #include <media/rawchip/rawchip.h>
 
 #include "touch.h"
