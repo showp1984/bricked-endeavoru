@@ -327,7 +327,6 @@ static void rndis_response_available(void *_rndis)
 {
 	struct f_rndis			*rndis = _rndis;
 	struct usb_request		*req = rndis->notify_req;
-	struct usb_composite_dev	*cdev = rndis->port.func.config->cdev;
 	__le32				*data = req->buf;
 	int				status;
 
@@ -345,7 +344,7 @@ static void rndis_response_available(void *_rndis)
 	status = usb_ep_queue(rndis->notify, req, GFP_ATOMIC);
 	if (status) {
 		atomic_dec(&rndis->notify_count);
-		DBG(cdev, "notify/0 --> %d\n", status);
+		pr_err("notify/0 --> %d\n", status);
 	}
 }
 
