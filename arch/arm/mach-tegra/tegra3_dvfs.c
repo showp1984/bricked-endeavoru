@@ -43,13 +43,13 @@ static const int cpu_millivolts[MAX_DVFS_FREQS] = {
 static const unsigned int cpu_cold_offs_mhz[MAX_DVFS_FREQS] = {
 	  50,  50,  50,  50,  50,  50,  50,  50,  50,   50,   50,   50,   50,   50,   50,   50,   50,   50};
 
-static const int avp_millivolts[MAX_DVFS_FREQS] = {
+int avp_millivolts[MAX_DVFS_FREQS] = {
 	950, 1000, 1050, 1100, 1150, 1200, 1250, 1300};
 
-static const int lp_cpu_millivolts[MAX_DVFS_FREQS] = {
+int lp_cpu_millivolts[MAX_DVFS_FREQS] = {
 	950, 1000, 1050, 1100, 1150, 1200, 1250, 1300};
 
-static const int emc_millivolts[MAX_DVFS_FREQS] = {
+int emc_millivolts[MAX_DVFS_FREQS] = {
 	950, 1000, 1050, 1100, 1150, 1200, 1250, 1300};
 
 static const int core_millivolts[MAX_DVFS_FREQS] = {
