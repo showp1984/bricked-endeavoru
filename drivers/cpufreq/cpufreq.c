@@ -676,6 +676,9 @@ static ssize_t show_bios_limit(struct cpufreq_policy *policy, char *buf)
 #include "../../arch/arm/mach-tegra/clock.h"
 
 extern int user_mv_table[MAX_DVFS_FREQS];
+extern int avp_millivolts[MAX_DVFS_FREQS];
+extern int lp_cpu_millivolts[MAX_DVFS_FREQS];
+extern int emc_millivolts[MAX_DVFS_FREQS];
 
 static ssize_t show_UV_mV_table(struct cpufreq_policy *policy, char *buf)
 {
@@ -716,7 +719,7 @@ static ssize_t store_UV_mV_table(struct cpufreq_policy *policy, char *buf, size_
 
 			/* TODO: need some robustness checks */
 			user_mv_table[i] = volt_cur;
-			pr_info("user mv tbl[%i]: %lu\n", i, volt_cur);
+			pr_info("cpu g mv tbl[%i]: %lu\n", i, volt_cur);
 
 			/* Non-standard sysfs interface: advance buf */
 			ret = sscanf(buf, "%s", size_cur);
@@ -725,6 +728,156 @@ static ssize_t store_UV_mV_table(struct cpufreq_policy *policy, char *buf, size_
 	}
 	/* update dvfs table here */
 	cpu_clk_g->dvfs->millivolts = user_mv_table;
+
+	return count;
+}
+
+static ssize_t show_lp_UV_mV_table(struct cpufreq_policy *policy, char *buf)
+{
+	int i = 0;
+	char *out = buf;
+	struct clk *cpu_clk_lp = tegra_get_clock_by_name("cpu_lp");
+
+	/* find how many actual entries there are */
+	i = cpu_clk_lp->dvfs->num_freqs;
+
+	for(i--; i >=0; i--) {
+		out += sprintf(out, "%lumhz: %i mV\n",
+				cpu_clk_lp->dvfs->freqs[i]/1000000,
+				cpu_clk_lp->dvfs->millivolts[i]);
+	}
+
+	return out - buf;
+}
+
+static ssize_t store_lp_UV_mV_table(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	int i = 0;
+	unsigned long volt_cur;
+	int ret;
+	char size_cur[16];
+
+	struct clk *cpu_clk_lp = tegra_get_clock_by_name("cpu_lp");
+
+	/* find how many actual entries there are */
+	i = cpu_clk_lp->dvfs->num_freqs;
+
+	for(i--; i >= 0; i--) {
+
+		if(cpu_clk_lp->dvfs->freqs[i]/1000000 != 0) {
+			ret = sscanf(buf, "%lu", &volt_cur);
+			if (ret != 1)
+				return -EINVAL;
+
+			/* TODO: need some robustness checks */
+			lp_cpu_millivolts[i] = volt_cur;
+			pr_info("cpu lp mv tbl[%i]: %lu\n", i, volt_cur);
+
+			/* Non-standard sysfs interface: advance buf */
+			ret = sscanf(buf, "%s", size_cur);
+			buf += (strlen(size_cur)+1);
+		}
+	}
+
+	return count;
+}
+
+static ssize_t show_emc_UV_mV_table(struct cpufreq_policy *policy, char *buf)
+{
+	int i = 0;
+	char *out = buf;
+	struct clk *clk_emc = tegra_get_clock_by_name("emc");
+
+	/* find how many actual entries there are */
+	i = clk_emc->dvfs->num_freqs;
+
+	for(i--; i >=0; i--) {
+		out += sprintf(out, "%lumhz: %i mV\n",
+				clk_emc->dvfs->freqs[i]/1000000,
+				clk_emc->dvfs->millivolts[i]);
+	}
+
+	return out - buf;
+}
+
+static ssize_t store_emc_UV_mV_table(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	int i = 0;
+	unsigned long volt_cur;
+	int ret;
+	char size_cur[16];
+
+	struct clk *clk_emc = tegra_get_clock_by_name("emc");
+
+	/* find how many actual entries there are */
+	i = clk_emc->dvfs->num_freqs;
+
+	for(i--; i >= 0; i--) {
+
+		if(clk_emc->dvfs->freqs[i]/1000000 != 0) {
+			ret = sscanf(buf, "%lu", &volt_cur);
+			if (ret != 1)
+				return -EINVAL;
+
+			/* TODO: need some robustness checks */
+			emc_millivolts[i] = volt_cur;
+			pr_info("emc mv tbl[%i]: %lu\n", i, volt_cur);
+
+			/* Non-standard sysfs interface: advance buf */
+			ret = sscanf(buf, "%s", size_cur);
+			buf += (strlen(size_cur)+1);
+		}
+	}
+
+	return count;
+}
+
+static ssize_t show_avp_UV_mV_table(struct cpufreq_policy *policy, char *buf)
+{
+	int i = 0;
+	char *out = buf;
+	struct clk *avp_clk = tegra_get_clock_by_name("3d");
+
+	/* find how many actual entries there are */
+	i = avp_clk->dvfs->num_freqs;
+
+	for(i--; i >=0; i--) {
+		out += sprintf(out, "%lumhz: %i mV\n",
+				avp_clk->dvfs->freqs[i]/1000000,
+				avp_clk->dvfs->millivolts[i]);
+	}
+
+	return out - buf;
+}
+
+static ssize_t store_avp_UV_mV_table(struct cpufreq_policy *policy, const char *buf, size_t count)
+{
+	int i = 0;
+	unsigned long volt_cur;
+	int ret;
+	char size_cur[16];
+
+	struct clk *avp_clk = tegra_get_clock_by_name("3d");
+
+	/* find how many actual entries there are */
+	i = avp_clk->dvfs->num_freqs;
+
+	for(i--; i >= 0; i--) {
+
+		if(avp_clk->dvfs->freqs[i]/1000000 != 0) {
+			ret = sscanf(buf, "%lu", &volt_cur);
+			if (ret != 1)
+				return -EINVAL;
+
+			/* TODO: need some robustness checks */
+			avp_millivolts[i] = volt_cur;
+			pr_info("avp mv tbl[%i]: %lu\n", i, volt_cur);
+
+			/* Non-standard sysfs interface: advance buf */
+			ret = sscanf(buf, "%s", size_cur);
+			buf += (strlen(size_cur)+1);
+		}
+	}
 
 	return count;
 }
@@ -746,6 +899,9 @@ cpufreq_freq_attr_rw(scaling_governor);
 cpufreq_freq_attr_rw(scaling_setspeed);
 #ifdef CONFIG_VOLTAGE_CONTROL
 cpufreq_freq_attr_rw(UV_mV_table);
+cpufreq_freq_attr_rw(lp_UV_mV_table);
+cpufreq_freq_attr_rw(emc_UV_mV_table);
+cpufreq_freq_attr_rw(avp_UV_mV_table);
 #endif
 
 static struct attribute *default_attrs[] = {
@@ -762,6 +918,9 @@ static struct attribute *default_attrs[] = {
 	&scaling_setspeed.attr,
 #ifdef CONFIG_VOLTAGE_CONTROL
 	&UV_mV_table.attr,
+	&lp_UV_mV_table.attr,
+	&emc_UV_mV_table.attr,
+	&avp_UV_mV_table.attr,
 #endif
 	NULL
 };
