@@ -1819,7 +1819,7 @@ static int baseband_xmm_power_driver_handle_resume(
 	int value;
 	unsigned long flags;
 	unsigned long timeout;
-	int delay = 10000; /* maxmum delay in msec */
+	int delay = 1000; /* maxmum delay in msec */
 
 
 	//pr_debug("%s\n", __func__);
