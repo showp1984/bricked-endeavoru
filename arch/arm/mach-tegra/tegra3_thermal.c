@@ -177,10 +177,10 @@ void tegra_thermal_alert(void *data)
 	long lo_limit_throttle_tj, hi_limit_throttle_tj;
 	long lo_limit_edp_tj = 0, hi_limit_edp_tj = 0;
 	long temp_low_dev, temp_low_tj;
+#ifdef CONFIG_TEGRA_EDP_LIMITS
 	int lo_limit_tj = 0, hi_limit_tj = 0;
 	int throttle_temp;
 	int last_throttle_temp;
-#ifdef CONFIG_TEGRA_EDP_LIMITS
 	const struct tegra_edp_limits *z;
 	int zones_sz;
 	int i;
@@ -261,6 +261,7 @@ void tegra_thermal_alert(void *data)
 #endif
 
 	/* Thorttle second chance */
+#ifdef CONFIG_TEGRA_EDP_LIMITS
 	throttle_temp = edp2tj(thermal, THROTTLE_TEMP);
 	last_throttle_temp = edp2tj(thermal, LAST_THROTTLE_TEMP);
 	if (temp_tj >= throttle_temp && temp_tj < last_throttle_temp)
@@ -275,6 +276,7 @@ void tegra_thermal_alert(void *data)
 	thermal->device->set_limits(thermal->device->data,
 					tj2dev(thermal->device, lo_limit_tj),
 					tj2dev(thermal->device, hi_limit_tj));
+#endif
 
 #ifndef CONFIG_TEGRA_THERMAL_SYSFS
 	if (temp_tj >= thermal->temp_throttle_tj) {
