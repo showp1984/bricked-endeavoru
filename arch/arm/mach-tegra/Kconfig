@@ -441,6 +441,12 @@ config TEGRA_EMC_TO_DDR_CLOCK
 	default "2" if ARCH_TEGRA_2x_SOC
 	default "1"
 
+config TEGRA_3D_GPU_OVERCLOCK
+	bool "GPU 3D Overclocking"
+	default n
+	help
+	  GPU 3D Overclocking option
+
 config TEGRA_INTERACTIVE_GOV_ON_EARLY_SUSPEND
 	bool "Use interactive cpu frequency governor when device enters early suspend"
 	depends on HAS_EARLYSUSPEND && CPU_FREQ && !TEGRA_CONSERVATIVE_GOV_ON_EARLY_SUSPEND
