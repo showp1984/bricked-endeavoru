@@ -52,6 +52,7 @@
 #ifdef CONFIG_VSYS_ALARM_TPS80032
 #include <linux/tps80032_vsys_alarm.h>
 #endif
+#include "tegra_pmqos.h"
 
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
@@ -580,6 +581,8 @@ static struct gpio_switch_regulator_subdev_data *gswitch_subdevs_xd[] = {
 	ADD_GPIO_REG(sdmmc_2v85_en),
 };
 
+unsigned int tegra_pmqos_boost_freq = BOOST_CPU_FREQ_MIN;
+
 static struct gpio_switch_regulator_platform_data  gswitch_pdata = {
 	.num_subdevs = ARRAY_SIZE(gswitch_subdevs),
 	.subdevs = gswitch_subdevs,
@@ -745,7 +748,7 @@ static struct tegra_suspend_platform_data endeavor_suspend_data = {
 	.sysclkreq_high	= true,
 	.board_suspend = endeavor_board_suspend,
 	.board_resume = endeavor_board_resume,
-	.cpu_resume_boost	= 1500000,
+	.cpu_resume_boost	= BOOST_CPU_FREQ_MIN,
 	.boost_resume_reason	= 0x80,
 };
 

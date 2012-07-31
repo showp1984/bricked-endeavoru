@@ -49,6 +49,8 @@
 #include "gpio-names.h"
 #include "baseband-xmm-power.h"
 
+#include "tegra_pmqos.h"
+
 MODULE_LICENSE("GPL");
 
 unsigned long modem_ver = XMM_MODEM_VER_1121;
@@ -130,7 +132,6 @@ static ssize_t host_dbg_store(struct device *dev,
 /*============================================================*/
 struct pm_qos_request_list modem_boost_cpu_freq_req;
 EXPORT_SYMBOL_GPL(modem_boost_cpu_freq_req);
-#define BOOST_CPU_FREQ_MIN	1500000
 
 EXPORT_SYMBOL(modem_ver);
 
@@ -598,7 +599,8 @@ static int baseband_modem_power_on(struct baseband_power_platform_data *data)
 	pr_info("%s }\n", __func__);
 
 	pr_info("%s:VP pm qos request CPU 1.5GHz\n", __func__);
-	pm_qos_update_request(&modem_boost_cpu_freq_req, (s32)BOOST_CPU_FREQ_MIN);
+	pm_qos_update_request(&modem_boost_cpu_freq_req, 
+				(s32)tegra_pmqos_boost_freq);
 
 #else  /* !BB_XMM_OEM1 */
 

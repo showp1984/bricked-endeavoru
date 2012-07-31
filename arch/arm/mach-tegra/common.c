@@ -51,6 +51,8 @@
 #include <mach/restart.h>
 #endif
 
+#include "tegra_pmqos.h"
+
 #define MC_SECURITY_CFG2	0x7c
 
 #define AHB_ARBITRATION_PRIORITY_CTRL		0x4
@@ -1384,7 +1386,7 @@ void cpufreq_restore_governor(void)
 				strlen("ondemand")) == 0) {
 
 		set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
-				"scaling_max_freq", "1500000");
+				"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ);
 
 	} else if (strncmp(cpufreq_gov_default,INTERACTIVE_GOVERNOR,
 				strlen(INTERACTIVE_GOVERNOR)) == 0) {

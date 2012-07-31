@@ -12,6 +12,8 @@
 #include "pokecpu.h"
 #include "cpu-tegra.h"
 
+#include "tegra_pmqos.h"
+
 #define POKE_DEBUG_ENABLE 1
 
 #define poke_attr(attrbute) 				\
@@ -24,8 +26,6 @@ static struct kobj_attribute attrbute##_attr = {	\
 	.store	= attrbute##_store,			\
 }
 
-#define DEF_TARGET_FREQ (1500000)
-#define DEF_POKE_FREQ (1500000)
 #define DEF_POKE_MS (100)
 #define DEF_IDLE_MS (300)
 
@@ -53,8 +53,8 @@ struct poke_cpu {
 };
 
 struct poke_cpu pokecpu = {
-	.threshold_freq = DEF_TARGET_FREQ,
-	.poke_freq   = DEF_POKE_FREQ,
+	.threshold_freq = BOOST_CPU_FREQ_MIN,
+	.poke_freq   = BOOST_CPU_FREQ_MIN,
 	.continuous  = false,
 	.poke_period = DEF_POKE_MS,
 	.idle_period = DEF_POKE_MS,
@@ -172,11 +172,12 @@ static ssize_t media_boost_freq_store(struct kobject *kobj,
 		cpufreq_get_policy(&policy, smp_processor_id());
 
 		/* update frequency qos request */
-		pm_qos_update_request(&poke_cpu_req, (s32)1500000);
+		pm_qos_update_request(&poke_cpu_req,
+					(s32)tegra_pmqos_boost_freq);
 
 		/* update frequency request right now */
 		cpufreq_driver_target(&policy,
-				1500000, CPUFREQ_RELATION_L);
+				tegra_pmqos_boost_freq, CPUFREQ_RELATION_L);
 
 		pr_info("[Poke]Orig user cap is %d,, media_boost is %c",
 				orig_user_cap, media_boost);
