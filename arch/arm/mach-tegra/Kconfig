@@ -441,6 +441,18 @@ config TEGRA_EMC_TO_DDR_CLOCK
 	default "2" if ARCH_TEGRA_2x_SOC
 	default "1"
 
+config TEGRA3_VARIANT_CPU_OVERCLOCK
+	bool "CPU Overclocking"
+	default n
+	help
+	  CPU Overclocking option
+
+config TEGRA3_GAMING_FIX
+	bool "CPU Limiter for Quadcore Gaming"
+	default n
+	help
+	  CPU Limiter for Quadcore Gaming
+
 config TEGRA_3D_GPU_OVERCLOCK
 	bool "GPU 3D Overclocking"
 	default n
