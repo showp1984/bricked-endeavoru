@@ -444,6 +444,11 @@ config TOUCHSCREEN_SYNAPTICS_SWEEP2WAKE
         depends on TOUCHSCREEN_SYNAPTICS_3k
         default n
 
+config TOUCHSCREEN_SYNAPTICS_AOSP
+        tristate "AOSP compiling for SYNAPTICS_3k based touchscreens"
+        depends on TOUCHSCREEN_SYNAPTICS_3k
+        default y
+
 config TOUCHSCREEN_UCB1400
 	tristate "Philips UCB1400 touchscreen"
 	depends on AC97_BUS
