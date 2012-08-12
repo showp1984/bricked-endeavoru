@@ -1383,7 +1383,6 @@ void cpufreq_restore_governor(void)
 
 	cpufreq_set_governor(cpufreq_gov_default);
 
-
 	if (strncmp(cpufreq_gov_default, "ondemand",
 				strlen("ondemand")) == 0) {
 
@@ -1396,9 +1395,22 @@ void cpufreq_restore_governor(void)
 			case 2:
 				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
 					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V2);
+				break;
+#ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
 			case 1:
+			case 0:
+				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
+					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V1);
+				if (cpu_process_id == 0)
+					pr_warn("Overclock: Variant Override Activated!\n");
+				break;
+#else
+			case 1:
+				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
+					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V1);
 				break;
 			case 0:
+#endif
 			default:
 				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
 					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ);

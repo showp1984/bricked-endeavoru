@@ -36,7 +36,7 @@
 #define T3_VARIANT_2_BOOST0	5
 #define T3_VARIANT_1_BOOST0	0
 
-#define GAMING_REDUCTION_FREQ	10
+#define GAMING_REDUCTION_FREQ	-10
 
 extern unsigned int tegra_pmqos_boost_freq;
 extern unsigned int tegra_pmqos_cap_freq;
