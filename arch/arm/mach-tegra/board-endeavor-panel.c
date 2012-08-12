@@ -114,11 +114,11 @@ static void mhl_gpio_switch(int on)
 #define ORIG_PWM_MIN 30
 
 #define MAP_SHARP_MAX 255
-#define MAP_SHARP_DEF 90
+#define MAP_SHARP_DEF 80
 #define MAP_SHARP_MIN 7
 
 #define MAP_SONY_MAX 255
-#define MAP_SONY_DEF 90
+#define MAP_SONY_DEF 80
 #define MAP_SONY_MIN 7
 
 #define MAP_AUO_MAX 255
