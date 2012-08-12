@@ -447,6 +447,13 @@ config TEGRA3_VARIANT_CPU_OVERCLOCK
 	help
 	  CPU Overclocking option
 
+config TEGRA3_VARIANT_OVERRIDE
+	bool "Variant Overclocking Override"
+	depends on TEGRA3_VARIANT_CPU_OVERCLOCK
+	default n
+	help
+	  Variant Overclocking Override
+
 config TEGRA3_GAMING_FIX
 	bool "CPU Limiter for Quadcore Gaming"
 	default n
