@@ -15,3 +15,9 @@ config BT_RFCOMM_TTY
 	help
 	  This option enables TTY emulation support for RFCOMM channels.
 
+config BT_CTS_WAKEUP
+        bool "RFCOMM CTS WAKEUP support"
+        depends on BT_RFCOMM
+	help
+	  This option enables RFCOMM CTS WAKEUP support
+
