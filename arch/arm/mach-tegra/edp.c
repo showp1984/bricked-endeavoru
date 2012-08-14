@@ -320,19 +320,11 @@ void __init tegra_init_cpu_edp_limits(unsigned int regulator_mA)
 			boost0 = T3_VARIANT_2_BOOST0;
 			boostx = T3_VARIANT_2_BOOSTX;
 			break;
-#ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
-		case 1:
-		case 0:
-			boost0 = T3_VARIANT_1_BOOST0;
-			boostx = T3_VARIANT_1_BOOSTX;
-			break;
-#else
 		case 1:
 			boost0 = T3_VARIANT_1_BOOST0;
 			boostx = T3_VARIANT_1_BOOSTX;
 			break;
 		case 0:
-#endif
 		default:
 			boost0 = GAMING_REDUCTION_FREQ;
 			boostx = 0;

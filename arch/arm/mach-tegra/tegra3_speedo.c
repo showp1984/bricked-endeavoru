@@ -305,7 +305,13 @@ void tegra_init_speedo_data(void)
 			break;
 		}
 	}
+#ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
 	cpu_process_id = iv -1;
+	if (cpu_process_id < 2)
+		cpu_process_id = 2;
+#else
+	cpu_process_id = iv -1;
+#endif
 
 	if (cpu_process_id == -1) {
 		pr_err("****************************************************");
