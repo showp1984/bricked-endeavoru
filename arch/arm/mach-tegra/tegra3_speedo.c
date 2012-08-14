@@ -103,6 +103,8 @@ static const u32 cpu_process_speedos[][CPU_PROCESS_CORNERS_NUM] = {
  */
 static int threshold_index;
 
+int cpu_process_id_orig;
+
 static int cpu_process_id;
 static int core_process_id;
 static int cpu_speedo_id;
@@ -307,8 +309,10 @@ void tegra_init_speedo_data(void)
 	}
 #ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
 	cpu_process_id = iv -1;
-	if (cpu_process_id < 2)
+	if (cpu_process_id < 2) {
+		cpu_process_id_orig = cpu_process_id;
 		cpu_process_id = 2;
+	}
 #else
 	cpu_process_id = iv -1;
 #endif
