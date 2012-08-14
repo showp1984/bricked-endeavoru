@@ -436,6 +436,10 @@ void tegra_get_system_edp_limits(const unsigned int **limits)
 
 #ifdef CONFIG_DEBUG_FS
 
+#ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
+extern int cpu_process_id_orig;
+#endif
+
 static int t3_variant_debugfs_show(struct seq_file *s, void *data)
 {
 	int cpu_speedo_id = tegra_cpu_speedo_id();
@@ -443,6 +447,9 @@ static int t3_variant_debugfs_show(struct seq_file *s, void *data)
 	int cpu_process_id = tegra_cpu_process_id();
 	int core_process_id = tegra_core_process_id();
 
+#ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
+	cpu_process_id = cpu_process_id_orig;
+#endif
 	seq_printf(s, "cpu_speedo_id => %d\n", cpu_speedo_id);
 	seq_printf(s, "soc_speedo_id => %d\n", soc_speedo_id);
 	seq_printf(s, "cpu_process_id => %d\n", cpu_process_id);
