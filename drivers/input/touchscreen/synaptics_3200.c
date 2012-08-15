@@ -31,6 +31,8 @@
 #include <linux/input/mt.h>
 extern int usb_get_connect_type(void);
 
+/* multi-touch Gaming Fix for AOSP ROMs */
+#define MT_GAMING_FIX	1 
 //#define SYN_SUSPEND_RESUME_POWEROFF
 #define SYN_I2C_RETRY_TIMES 10
 #define SYN_WIRELESS_DEBUG
@@ -1595,7 +1597,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 							ts->first_pressed = 1;
 						printk(KERN_INFO "[TP] E%d@%d, %d\n", i + 1,
 						finger_data[i][0], finger_data[i][1]);
-#ifdef SYN_CALIBRATION_CONTROL
+#if defined (SYN_CALIBRATION_CONTROL) && (!MT_GAMING_FIX)
 						if (i == 0 && !ts->pre_finger_data[0][0] &&
 							(abs(ts->pre_finger_data[1][0] - finger_data[0][0]) > 100 ||
 							abs(ts->pre_finger_data[1][1] - finger_data[0][1]) > 100)) {
@@ -1739,7 +1741,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 								ts->pre_finger_data[i + 1][1] = finger_data[i][1];
 								printk(KERN_INFO "[TP] S%d@%d, %d\n", i + 1,
 									finger_data[i][0], finger_data[i][1]);
-#ifdef SYN_CALIBRATION_CONTROL
+#if defined (SYN_CALIBRATION_CONTROL) && (!MT_GAMING_FIX)
 								if (ts->finger_count == ts->finger_support) {
 									ret = i2c_syn_write_byte_data(ts->client,
 										get_address_base(ts, 0x11, COMMAND_BASE), 0x01);
@@ -2583,6 +2585,13 @@ static int synaptics_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 	ts->first_pressed = 0;
 
 #ifdef SYN_CALIBRATION_CONTROL
+#ifdef MT_GAMING_FIX
+	ret = i2c_syn_write_byte_data(ts->client,
+		get_address_base(ts, 0x11, COMMAND_BASE), 0x01);
+	if (ret < 0)
+		return i2c_syn_error_handler(ts, 0, "w:ReZero_forced", __func__);
+	printk(KERN_INFO "[TP] %s: Touch Calibration Confirmed, rezero\n", __func__);
+#endif
 	ret = i2c_syn_write_byte_data(ts->client,
                 get_address_base(ts, 0x54, CONTROL_BASE) + 0x10, ts->relaxation);
 	if (ret < 0)
