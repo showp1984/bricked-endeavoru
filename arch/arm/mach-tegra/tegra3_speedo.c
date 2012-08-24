@@ -309,8 +309,8 @@ void tegra_init_speedo_data(void)
 	}
 #ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
 	cpu_process_id = iv -1;
+	cpu_process_id_orig = cpu_process_id;
 	if (cpu_process_id < 2) {
-		cpu_process_id_orig = cpu_process_id;
 		cpu_process_id = 2;
 	}
 #else
