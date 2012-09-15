@@ -60,13 +60,11 @@ static struct tegra_mpdec_tuners {
 	unsigned int startdelay;
 	unsigned int delay;
 	unsigned int pause;
-	bool scroff_single_core;
 	unsigned long int idle_freq;
 } tegra_mpdec_tuners_ins = {
 	.startdelay = TEGRA_MPDEC_STARTDELAY,
 	.delay = TEGRA_MPDEC_DELAY,
 	.pause = TEGRA_MPDEC_PAUSE,
-	.scroff_single_core = true,
 	.idle_freq = TEGRA_MPDEC_IDLE_FREQ,
 };
 
@@ -226,6 +224,8 @@ out:
 static void tegra_mpdec_early_suspend(struct early_suspend *h)
 {
 	int cpu = 0;
+/* TODO: power down all tegra hp cpus and power up lp */
+#if 0
 	for_each_possible_cpu(cpu) {
 		mutex_lock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 		if (((cpu >= (CONFIG_NR_CPUS - 1)) && (num_online_cpus() > 1)) && (tegra_mpdec_tuners_ins.scroff_single_core)) {
@@ -237,11 +237,17 @@ static void tegra_mpdec_early_suspend(struct early_suspend *h)
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = true;
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
+#endif
 }
 
 static void tegra_mpdec_late_resume(struct early_suspend *h)
 {
 	int cpu = 0;
+/* TODO:
+   remove lp lock
+   power down lp cpu and power up one hp cpu
+   afterwards let mpdecision decide if the hp is needed and revert to lp if it is not */
+#if 0
 	for_each_possible_cpu(cpu) {
 		mutex_lock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 		if ((cpu >= (CONFIG_NR_CPUS - 1)) && (num_online_cpus() < CONFIG_NR_CPUS)) {
@@ -257,6 +263,7 @@ static void tegra_mpdec_late_resume(struct early_suspend *h)
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = false;
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
+#endif
 }
 
 static struct early_suspend tegra_mpdec_early_suspend_handler = {
@@ -278,7 +285,6 @@ static ssize_t show_##file_name						\
 show_one(startdelay, startdelay);
 show_one(delay, delay);
 show_one(pause, pause);
-show_one(scroff_single_core, scroff_single_core);
 
 static ssize_t show_idle_freq (struct kobject *kobj, struct attribute *attr,
                                    char *buf)
@@ -395,27 +401,6 @@ static ssize_t store_idle_freq(struct kobject *a, struct attribute *b,
 	return count;
 }
 
-static ssize_t store_scroff_single_core(struct kobject *a, struct attribute *b,
-				   const char *buf, size_t count)
-{
-	unsigned int input;
-	int ret;
-	ret = sscanf(buf, "%u", &input);
-	if (ret != 1)
-		return -EINVAL;
-	switch (buf[0]) {
-	case '0':
-		tegra_mpdec_tuners_ins.scroff_single_core = input;
-		break;
-	case '1':
-		tegra_mpdec_tuners_ins.scroff_single_core = input;
-		break;
-	default:
-		ret = -EINVAL;
-	}
-	return count;
-}
-
 static ssize_t store_enabled(struct kobject *a, struct attribute *b,
 				   const char *buf, size_t count)
 {
@@ -526,7 +511,6 @@ static ssize_t store_twts_threshold_down(struct kobject *a, struct attribute *b,
 define_one_global_rw(startdelay);
 define_one_global_rw(delay);
 define_one_global_rw(pause);
-define_one_global_rw(scroff_single_core);
 define_one_global_rw(idle_freq);
 define_one_global_rw(enabled);
 define_one_global_rw(nwns_threshold_up);
@@ -538,7 +522,6 @@ static struct attribute *tegra_mpdec_attributes[] = {
 	&startdelay.attr,
 	&delay.attr,
 	&pause.attr,
-	&scroff_single_core.attr,
 	&idle_freq.attr,
 	&enabled.attr,
 	&nwns_threshold_up.attr,
