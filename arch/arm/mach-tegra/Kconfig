@@ -387,7 +387,7 @@ config TEGRA_AUTO_HOTPLUG
 
 config TEGRA_MPDECISION
         bool "Enable better automatic CPU hot-plugging"
-	depends on HOTPLUG_CPU && CPU_FREQ && !ARCH_CPU_PROBE_RELEASE && !ARCH_TEGRA_2x_SOC
+	depends on HOTPLUG_CPU && CPU_FREQ && !ARCH_CPU_PROBE_RELEASE && !ARCH_TEGRA_2x_SOC && !TEGRA_AUTO_HOTPLUG
 	default y
 	help
 	  This option enables turning CPUs off/on and switching tegra
