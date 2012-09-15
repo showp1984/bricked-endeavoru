@@ -16,7 +16,7 @@
 #include "base.h"
 
 static struct work_struct cpuplug_work;
-extern struct workqueue_struct *cpuplug_wq;
+static struct workqueue_struct *cpuplug_wq;
 
 static struct sysdev_class_attribute *cpu_sysdev_class_attrs[];
 
@@ -334,6 +334,10 @@ int __init cpu_dev_init(void)
 		err = sched_create_sysfs_power_savings_entries(&cpu_sysdev_class);
 #endif
 
+	cpuplug_wq = alloc_workqueue(
+				 "cpu-plug", WQ_UNBOUND | WQ_RESCUER | WQ_FREEZABLE, 1);
+	if (!cpuplug_wq)
+		return -ENOMEM;
 	INIT_WORK(&cpuplug_work, tegra_cpuplug_work_func);
 
 	return err;
