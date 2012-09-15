@@ -38,7 +38,7 @@
 #define TEGRA_MPDEC_STARTDELAY            70000
 #define TEGRA_MPDEC_DELAY                 500
 #define TEGRA_MPDEC_PAUSE                 10000
-#define TEGRA_MPDEC_IDLE_FREQ             486000
+#define TEGRA_MPDEC_IDLE_FREQ             640000
 
 enum {
 	TEGRA_MPDEC_DISABLED = 0,
@@ -86,6 +86,43 @@ static unsigned long get_rate(int cpu)
         return rate;
 }
 
+static int get_slowest_cpu(void)
+{
+        int i, cpu = 0;
+        unsigned long rate, slow_rate = 0;
+
+        for (i = 0; i < CONFIG_NR_CPUS; i++) {
+                rate = get_rate(i);
+                if ((rate < slow_rate) && (slow_rate != 0)) {
+                        cpu = i;
+                        slow_rate = rate;
+                }
+                if (slow_rate == 0) {
+                        slow_rate = rate;
+                }
+        }
+
+        return cpu;
+}
+
+static int get_slowest_cpu_rate(void)
+{
+        int i = 0;
+        unsigned long rate, slow_rate = 0;
+
+        for (i = 0; i < CONFIG_NR_CPUS; i++) {
+                rate = get_rate(i);
+                if ((rate < slow_rate) && (slow_rate != 0)) {
+                        slow_rate = rate;
+                }
+                if (slow_rate == 0) {
+                        slow_rate = rate;
+                }
+        }
+
+        return slow_rate;
+}
+
 static int mp_decision(void)
 {
 	static bool first_call = true;
@@ -114,26 +151,23 @@ static int mp_decision(void)
 
 	rq_depth = get_rq_info();
 #ifdef DEBUG
-        pr_info(MPDEC_TAG"RQ: %u", rq_depth);
+        pr_info(MPDEC_TAG"[DEBUG] RQ: %u", rq_depth);
 #endif
 	nr_cpu_online = num_online_cpus();
 
 	if (nr_cpu_online) {
 		index = (nr_cpu_online - 1) * 2;
-		if ((nr_cpu_online < 2) && (rq_depth >= NwNs_Threshold[index])) {
+		if ((nr_cpu_online < CONFIG_NR_CPUS) && (rq_depth >= NwNs_Threshold[index])) {
 			if (total_time >= TwTs_Threshold[index]) {
 				new_state = TEGRA_MPDEC_UP;
-                                if (get_rate((CONFIG_NR_CPUS - 2)) <=
-                                    tegra_mpdec_tuners_ins.idle_freq)
+                                if (get_slowest_cpu_rate() <= tegra_mpdec_tuners_ins.idle_freq)
                                         new_state = TEGRA_MPDEC_IDLE;
 			}
-		} else if (rq_depth <= NwNs_Threshold[index+1]) {
+		} else if ((nr_cpu_online > 1) && (rq_depth <= NwNs_Threshold[index+1])) {
 			if (total_time >= TwTs_Threshold[index+1] ) {
 				new_state = TEGRA_MPDEC_DOWN;
-                                if (cpu_online((CONFIG_NR_CPUS - 1)))
-		                        if (get_rate((CONFIG_NR_CPUS - 1)) >
-                                            tegra_mpdec_tuners_ins.idle_freq)
-			                        new_state = TEGRA_MPDEC_IDLE;
+		                if (get_slowest_cpu_rate() > tegra_mpdec_tuners_ins.idle_freq)
+                                        new_state = TEGRA_MPDEC_IDLE;
 			}
 		} else {
 			new_state = TEGRA_MPDEC_IDLE;
@@ -149,6 +183,9 @@ static int mp_decision(void)
 
 	last_time = ktime_to_ms(ktime_get());
 
+#ifdef DEBUG
+        pr_info(MPDEC_TAG"[DEBUG] New State: %i", new_state);
+#endif
 	return new_state;
 }
 
