@@ -56,7 +56,7 @@ struct tegra_mpdec_cpudata_t {
 static DEFINE_PER_CPU(struct tegra_mpdec_cpudata_t, tegra_mpdec_cpudata);
 
 static struct delayed_work tegra_mpdec_work;
-static DEFINE_MUTEX(msm_cpu_lock);
+static DEFINE_MUTEX(tegra_cpu_lock);
 
 static struct tegra_mpdec_tuners {
 	unsigned int startdelay;
@@ -197,7 +197,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 	if (per_cpu(tegra_mpdec_cpudata, (CONFIG_NR_CPUS - 1)).device_suspended == true)
 		goto out;
 
-	if (!mutex_trylock(&msm_cpu_lock))
+	if (!mutex_trylock(&tegra_cpu_lock))
 		goto out;
 
 	/* if sth messed with the cpus, update the check vars so we can proceed */
@@ -254,7 +254,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 		pr_err(MPDEC_TAG"%s: invalid mpdec hotplug state %d\n",
 		       __func__, state);
 	}
-	mutex_unlock(&msm_cpu_lock);
+	mutex_unlock(&tegra_cpu_lock);
 
 out:
 	if (state != TEGRA_MPDEC_DISABLED)
