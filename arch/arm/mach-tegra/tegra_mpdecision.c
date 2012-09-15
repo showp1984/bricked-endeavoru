@@ -68,8 +68,8 @@ static struct tegra_mpdec_tuners {
 	.idle_freq = TEGRA_MPDEC_IDLE_FREQ,
 };
 
-static unsigned int NwNs_Threshold[4] = {19, 30, 19, 11, 19, 11, 0, 11};
-static unsigned int TwTs_Threshold[4] = {140, 0, 140, 190, 140, 190, 0, 190};
+static unsigned int NwNs_Threshold[8] = {19, 30, 19, 11, 19, 11, 0, 11};
+static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
 
 extern unsigned int get_rq_info(void);
 extern unsigned int tegra_getspeed(int);
@@ -81,7 +81,7 @@ static unsigned long get_rate(int cpu)
 {
         unsigned long rate = 0;
         rate = tegra_getspeed(cpu) * 1000;
-        return rate
+        return rate;
 }
 
 static int mp_decision(void)
@@ -223,9 +223,9 @@ out:
 
 static void tegra_mpdec_early_suspend(struct early_suspend *h)
 {
-	int cpu = 0;
 /* TODO: power down all tegra hp cpus and power up lp */
 #if 0
+	int cpu = 0;
 	for_each_possible_cpu(cpu) {
 		mutex_lock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 		if (((cpu >= (CONFIG_NR_CPUS - 1)) && (num_online_cpus() > 1)) && (tegra_mpdec_tuners_ins.scroff_single_core)) {
@@ -242,12 +242,12 @@ static void tegra_mpdec_early_suspend(struct early_suspend *h)
 
 static void tegra_mpdec_late_resume(struct early_suspend *h)
 {
-	int cpu = 0;
 /* TODO:
    remove lp lock
    power down lp cpu and power up one hp cpu
    afterwards let mpdecision decide if the hp is needed and revert to lp if it is not */
 #if 0
+	int cpu = 0;
 	for_each_possible_cpu(cpu) {
 		mutex_lock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 		if ((cpu >= (CONFIG_NR_CPUS - 1)) && (num_online_cpus() < CONFIG_NR_CPUS)) {
@@ -380,23 +380,13 @@ static ssize_t store_pause(struct kobject *a, struct attribute *b,
 static ssize_t store_idle_freq(struct kobject *a, struct attribute *b,
 				   const char *buf, size_t count)
 {
-	long unsigned int input, check;
+	long unsigned int input;
 	int ret;
 	ret = sscanf(buf, "%lu", &input);
 	if (ret != 1)
 		return -EINVAL;
 
-	check = acpu_check_khz_value(input);
-
-	if (check == 1) {
-		tegra_mpdec_tuners_ins.idle_freq = input;
-	}
-	if (check == 0) {
-		tegra_mpdec_tuners_ins.idle_freq = TEGRA_MPDEC_IDLE_FREQ;
-	}
-	if (check > 1) {
-		tegra_mpdec_tuners_ins.idle_freq = check;
-	}
+	tegra_mpdec_tuners_ins.idle_freq = input;
 
 	return count;
 }
