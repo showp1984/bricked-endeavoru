@@ -32,6 +32,8 @@
 #include <linux/hrtimer.h>
 #include <linux/delay.h>
 
+#define DEBUG 1
+
 #define MPDEC_TAG                       "[MPDEC]: "
 #define TEGRA_MPDEC_STARTDELAY            70000
 #define TEGRA_MPDEC_DELAY                 500
@@ -111,6 +113,9 @@ static int mp_decision(void)
 	total_time += this_time;
 
 	rq_depth = get_rq_info();
+#ifdef DEBUG
+        pr_info(MPDEC_TAG"RQ: %u", rq_depth);
+#endif
 	nr_cpu_online = num_online_cpus();
 
 	if (nr_cpu_online) {
