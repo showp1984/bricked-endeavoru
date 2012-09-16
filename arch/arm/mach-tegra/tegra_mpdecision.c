@@ -32,11 +32,11 @@
 #include <linux/hrtimer.h>
 #include <linux/delay.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define MPDEC_TAG                       "[MPDEC]: "
 #define TEGRA_MPDEC_STARTDELAY            20000
-#define TEGRA_MPDEC_DELAY                 500
+#define TEGRA_MPDEC_DELAY                 100
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             640000
 
