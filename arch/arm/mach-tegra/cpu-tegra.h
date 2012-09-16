@@ -21,6 +21,8 @@
 #ifndef __MACH_TEGRA_CPU_TEGRA_H
 #define __MACH_TEGRA_CPU_TEGRA_H
 
+#include <linux/dcache.h>
+
 unsigned int tegra_getspeed(unsigned int cpu);
 int tegra_update_cpu_speed(unsigned long rate);
 int tegra_cpu_set_speed_cap(unsigned int *speed_cap);
