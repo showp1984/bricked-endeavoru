@@ -280,6 +280,7 @@ static int tegra_lp_cpu_handler(bool state)
 static void tegra_mpdec_work_thread(struct work_struct *work)
 {
 	unsigned int cpu = nr_cpu_ids;
+        static int lp_dcnt, lp_ucnt = 0;
 	cputime64_t on_time = 0;
         bool suspended = false;
 
@@ -347,14 +348,23 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 }
 		break;
 	case TEGRA_MPDEC_LPCPU_DOWN:
-                if (lp_up)
-                        if(tegra_lp_cpu_handler(false))
-                                pr_info(MPDEC_TAG" LPCPU powered down.\n");
+                if (lp_up) {
+                        lp_dcnt++;
+                        if (lp_dcnt > 2) {
+                                if(tegra_lp_cpu_handler(false))
+                                        pr_info(MPDEC_TAG" LPCPU powered down.\n");
+                                lp_dcnt = 0;
+                        }
+                }
 		break;
 	case TEGRA_MPDEC_LPCPU_UP:
                 if ((!lp_up) && (lp_possible()))
-                        if(tegra_lp_cpu_handler(true))
-                                pr_info(MPDEC_TAG" LPCPU powered up.\n");
+                        lp_ucnt++;
+                        if (lp_ucnt > 2) {
+                                if(tegra_lp_cpu_handler(true))
+                                        pr_info(MPDEC_TAG" LPCPU powered up.\n");
+                                lp_ucnt = 0;
+                        }
 		break;
 	default:
 		pr_err(MPDEC_TAG"%s: invalid mpdec hotplug state %d\n",
