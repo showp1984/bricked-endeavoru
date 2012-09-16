@@ -21,6 +21,8 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
+#include <linux/clk.h>
+#include <linux/err.h>
 #include <linux/earlysuspend.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
@@ -69,6 +71,10 @@ static struct tegra_mpdec_tuners {
 	.pause = TEGRA_MPDEC_PAUSE,
 	.idle_freq = TEGRA_MPDEC_IDLE_FREQ,
 };
+
+static struct clk *cpu_clk;
+static struct clk *cpu_g_clk;
+static struct clk *cpu_lp_clk;
 
 static unsigned int NwNs_Threshold[8] = {19, 30, 19, 11, 19, 11, 0, 11};
 static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
@@ -584,6 +590,13 @@ static int __init tegra_mpdec(void)
 	}
 
         was_paused = true;
+
+	cpu_clk = clk_get_sys(NULL, "cpu");
+	cpu_g_clk = clk_get_sys(NULL, "cpu_g");
+	cpu_lp_clk = clk_get_sys(NULL, "cpu_lp");
+
+	if (IS_ERR(cpu_clk) || IS_ERR(cpu_g_clk) || IS_ERR(cpu_lp_clk))
+		return -ENOENT;
 
 	INIT_DELAYED_WORK(&tegra_mpdec_work, tegra_mpdec_work_thread);
 	if (state != TEGRA_MPDEC_DISABLED)
