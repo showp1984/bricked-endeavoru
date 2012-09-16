@@ -34,6 +34,8 @@
 #include <linux/hrtimer.h>
 #include <linux/delay.h>
 
+#include "cpu-tegra.h"
+
 #define DEBUG 0
 
 #define MPDEC_TAG                       "[MPDEC]: "
@@ -80,7 +82,6 @@ static unsigned int NwNs_Threshold[8] = {19, 30, 19, 11, 19, 11, 0, 11};
 static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
 
 extern unsigned int get_rq_info(void);
-extern unsigned int tegra_getspeed(int);
 
 unsigned int state = TEGRA_MPDEC_IDLE;
 bool was_paused = false;
@@ -200,6 +201,32 @@ static int mp_decision(void)
 		         rq_depth, new_state, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
 #endif
 	return new_state;
+}
+
+static int tegra_lp_cpu_handler(bool state)
+{
+        switch (state) {
+        case true:
+                if(!clk_set_parent(cpu_clk, cpu_lp_clk)) {
+		        pr_info(MPDEC_TAG" power up LPCPU");
+                        /* catch-up with governor target speed */
+                        tegra_cpu_set_speed_cap(NULL);
+                } else {
+                        pr_err(MPDEC_TAG" %s (up): clk_set_parent fail\n", __func__);
+                        return 0;
+                }
+                break;
+        case false:
+                if (!clk_set_parent(cpu_clk, cpu_g_clk)) {
+                        pr_info(MPDEC_TAG" power down LPCPU");
+                } else {
+                        pr_err(MPDEC_TAG" %s (down): clk_set_parent fail\n", __func__);
+                        return 0;
+                }
+                break;
+        }
+
+        return 1;
 }
 
 static void tegra_mpdec_work_thread(struct work_struct *work)
