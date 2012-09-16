@@ -82,7 +82,7 @@ bool was_paused = false;
 static unsigned long get_rate(int cpu)
 {
         unsigned long rate = 0;
-        rate = tegra_getspeed(cpu) * 1000;
+        rate = tegra_getspeed(cpu);
         return rate;
 }
 
@@ -92,12 +92,21 @@ static int get_slowest_cpu(void)
         unsigned long rate, slow_rate = 0;
 
         for (i = 0; i < CONFIG_NR_CPUS; i++) {
+
+                if (!cpu_online(i))
+                        continue;
+
                 rate = get_rate(i);
-                if ((rate < slow_rate) && (slow_rate != 0)) {
-                        cpu = i;
+
+                if (slow_rate == 0) {
                         slow_rate = rate;
                 }
-                if (slow_rate == 0) {
+
+                if ((rate <= slow_rate) && (slow_rate != 0)) {
+                        if (i == 0)
+                                continue;
+
+                        cpu = i;
                         slow_rate = rate;
                 }
         }
@@ -237,7 +246,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 		}
 		break;
 	case TEGRA_MPDEC_UP:
-		cpu = (CONFIG_NR_CPUS - 1);
+		cpu = cpumask_next_zero(0, cpu_online_mask);
 		if (cpu < nr_cpu_ids) {
 			if ((per_cpu(tegra_mpdec_cpudata, cpu).online == false) && (!cpu_online(cpu))) {
 				cpu_up(cpu);
