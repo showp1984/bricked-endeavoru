@@ -35,7 +35,7 @@
 #define DEBUG 1
 
 #define MPDEC_TAG                       "[MPDEC]: "
-#define TEGRA_MPDEC_STARTDELAY            70000
+#define TEGRA_MPDEC_STARTDELAY            20000
 #define TEGRA_MPDEC_DELAY                 500
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             640000
@@ -193,7 +193,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 {
 	unsigned int cpu = nr_cpu_ids;
 	cputime64_t on_time = 0;
-        bool suspended = true;
+        bool suspended = false;
 
         for_each_possible_cpu(cpu)
 	        if ((per_cpu(tegra_mpdec_cpudata, cpu).device_suspended == true))
