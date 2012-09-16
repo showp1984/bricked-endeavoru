@@ -592,6 +592,8 @@ static int __init tegra_mpdec(void)
 		per_cpu(tegra_mpdec_cpudata, cpu).online = true;
 	}
 
+        was_paused = true;
+
 	INIT_DELAYED_WORK(&tegra_mpdec_work, tegra_mpdec_work_thread);
 	if (state != TEGRA_MPDEC_DISABLED)
 		schedule_delayed_work(&tegra_mpdec_work, 0);
