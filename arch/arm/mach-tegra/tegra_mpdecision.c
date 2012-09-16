@@ -28,13 +28,16 @@
 #include <linux/cpufreq.h>
 #include <linux/workqueue.h>
 #include <linux/completion.h>
+#include <linux/io.h>
 #include <linux/cpu.h>
 #include <linux/cpumask.h>
 #include <asm-generic/cputime.h>
 #include <linux/hrtimer.h>
 #include <linux/delay.h>
 
+#include "clock.h"
 #include "cpu-tegra.h"
+#include "pm.h"
 
 #define DEBUG 0
 
@@ -44,11 +47,16 @@
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             640000
 
+#define TEGRA_MPDEC_LPCPU_UPDELAY         200
+#define TEGRA_MPDEC_LPCPU_DOWNDELAY       200
+
 enum {
 	TEGRA_MPDEC_DISABLED = 0,
 	TEGRA_MPDEC_IDLE,
 	TEGRA_MPDEC_DOWN,
 	TEGRA_MPDEC_UP,
+        TEGRA_MPDEC_LPCPU_UP,
+        TEGRA_MPDEC_LPCPU_DOWN,
 };
 
 struct tegra_mpdec_cpudata_t {
@@ -61,6 +69,7 @@ static DEFINE_PER_CPU(struct tegra_mpdec_cpudata_t, tegra_mpdec_cpudata);
 
 static struct delayed_work tegra_mpdec_work;
 static DEFINE_MUTEX(tegra_cpu_lock);
+static DEFINE_MUTEX(tegra_lpcpu_lock);
 
 static struct tegra_mpdec_tuners {
 	unsigned int startdelay;
@@ -78,6 +87,9 @@ static struct clk *cpu_clk;
 static struct clk *cpu_g_clk;
 static struct clk *cpu_lp_clk;
 
+static unsigned int idle_top_freq;
+static unsigned int idle_bottom_freq;
+
 static unsigned int NwNs_Threshold[8] = {19, 30, 19, 11, 19, 11, 0, 11};
 static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
 
@@ -85,6 +97,7 @@ extern unsigned int get_rq_info(void);
 
 unsigned int state = TEGRA_MPDEC_IDLE;
 bool was_paused = false;
+bool lp_up = false;
 
 static unsigned long get_rate(int cpu)
 {
@@ -139,6 +152,19 @@ static int get_slowest_cpu_rate(void)
         return slow_rate;
 }
 
+static bool lp_possible(void)
+{
+        int i = 0;
+        bool possible = true;
+
+        for (i = 1; i < CONFIG_NR_CPUS; i++) {
+                if (cpu_online(i))
+                        possible = false;
+        }
+
+        return possible;
+}
+
 static int mp_decision(void)
 {
 	static bool first_call = true;
@@ -172,13 +198,21 @@ static int mp_decision(void)
 		index = (nr_cpu_online - 1) * 2;
 		if ((nr_cpu_online < CONFIG_NR_CPUS) && (rq_depth >= NwNs_Threshold[index])) {
 			if (total_time >= TwTs_Threshold[index]) {
-				new_state = TEGRA_MPDEC_UP;
+                                if (!lp_up)
+                                        new_state = TEGRA_MPDEC_UP;
+                                else if (get_rate(0) >= idle_top_freq)
+                                        new_state = TEGRA_MPDEC_LPCPU_DOWN;
+
                                 if (get_slowest_cpu_rate() <= tegra_mpdec_tuners_ins.idle_freq)
                                         new_state = TEGRA_MPDEC_IDLE;
 			}
-		} else if ((nr_cpu_online > 1) && (rq_depth <= NwNs_Threshold[index+1])) {
+		} else if (rq_depth <= NwNs_Threshold[index+1]) {
 			if (total_time >= TwTs_Threshold[index+1] ) {
-				new_state = TEGRA_MPDEC_DOWN;
+                                if (nr_cpu_online > 1)
+                                        new_state = TEGRA_MPDEC_DOWN;
+                                else if (get_rate(0) <= idle_top_freq)
+                                        new_state = TEGRA_MPDEC_LPCPU_UP;
+
 		                if (get_slowest_cpu_rate() > tegra_mpdec_tuners_ins.idle_freq)
                                         new_state = TEGRA_MPDEC_IDLE;
 			}
@@ -205,28 +239,42 @@ static int mp_decision(void)
 
 static int tegra_lp_cpu_handler(bool state)
 {
+        bool err = false;
+
+        if (!mutex_trylock(&tegra_lpcpu_lock))
+                return 0;
+
         switch (state) {
         case true:
                 if(!clk_set_parent(cpu_clk, cpu_lp_clk)) {
 		        pr_info(MPDEC_TAG" power up LPCPU");
-                        /* catch-up with governor target speed */
-                        tegra_cpu_set_speed_cap(NULL);
+                        lp_up = true;
                 } else {
                         pr_err(MPDEC_TAG" %s (up): clk_set_parent fail\n", __func__);
-                        return 0;
+                        err = true;
                 }
+                /* catch-up with governor target speed */
+                tegra_cpu_set_speed_cap(NULL);
                 break;
         case false:
                 if (!clk_set_parent(cpu_clk, cpu_g_clk)) {
                         pr_info(MPDEC_TAG" power down LPCPU");
+                        lp_up = false;
                 } else {
                         pr_err(MPDEC_TAG" %s (down): clk_set_parent fail\n", __func__);
-                        return 0;
+                        err = true;
                 }
+                /* catch-up with governor target speed */
+                tegra_cpu_set_speed_cap(NULL);
                 break;
         }
 
-        return 1;
+        mutex_unlock(&tegra_lpcpu_lock);
+
+        if (err)
+                return 0;
+        else
+                return 1;
 }
 
 static void tegra_mpdec_work_thread(struct work_struct *work)
@@ -265,38 +313,48 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 	case TEGRA_MPDEC_IDLE:
 		break;
 	case TEGRA_MPDEC_DOWN:
-		cpu = get_slowest_cpu();
-		if (cpu < nr_cpu_ids) {
-			if ((per_cpu(tegra_mpdec_cpudata, cpu).online == true) && (cpu_online(cpu))) {
-				cpu_down(cpu);
-				per_cpu(tegra_mpdec_cpudata, cpu).online = false;
-				on_time = ktime_to_ms(ktime_get()) - per_cpu(tegra_mpdec_cpudata, cpu).on_time;
-				pr_info(MPDEC_TAG"CPU[%d] on->off | Mask=[%d%d%d%d] | time online: %llu\n",
-						cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3), on_time);
-			} else if (per_cpu(tegra_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
-				pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
-						cpu, tegra_mpdec_tuners_ins.pause);
-				msleep(tegra_mpdec_tuners_ins.pause);
-				was_paused = true;
-			}
-		}
+                cpu = get_slowest_cpu();
+                if (cpu < nr_cpu_ids) {
+                        if ((per_cpu(tegra_mpdec_cpudata, cpu).online == true) && (cpu_online(cpu))) {
+                                cpu_down(cpu);
+                                per_cpu(tegra_mpdec_cpudata, cpu).online = false;
+                                on_time = ktime_to_ms(ktime_get()) - per_cpu(tegra_mpdec_cpudata, cpu).on_time;
+                                pr_info(MPDEC_TAG"CPU[%d] on->off | Mask=[%d%d%d%d] | time online: %llu\n",
+                                                cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3), on_time);
+                        } else if (per_cpu(tegra_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
+                                pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
+                                                cpu, tegra_mpdec_tuners_ins.pause);
+                                msleep(tegra_mpdec_tuners_ins.pause);
+                                was_paused = true;
+                        }
+                }
 		break;
 	case TEGRA_MPDEC_UP:
-		cpu = cpumask_next_zero(0, cpu_online_mask);
-		if (cpu < nr_cpu_ids) {
-			if ((per_cpu(tegra_mpdec_cpudata, cpu).online == false) && (!cpu_online(cpu))) {
-				cpu_up(cpu);
-				per_cpu(tegra_mpdec_cpudata, cpu).online = true;
-				per_cpu(tegra_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
-				pr_info(MPDEC_TAG"CPU[%d] off->on | Mask=[%d%d%d%d]\n",
-						cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
-			} else if (per_cpu(tegra_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
-				pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
-						cpu, tegra_mpdec_tuners_ins.pause);
-				msleep(tegra_mpdec_tuners_ins.pause);
-				was_paused = true;
-			}
-		}
+                cpu = cpumask_next_zero(0, cpu_online_mask);
+                if (cpu < nr_cpu_ids) {
+                        if ((per_cpu(tegra_mpdec_cpudata, cpu).online == false) && (!cpu_online(cpu))) {
+                                cpu_up(cpu);
+                                per_cpu(tegra_mpdec_cpudata, cpu).online = true;
+                                per_cpu(tegra_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
+                                pr_info(MPDEC_TAG"CPU[%d] off->on | Mask=[%d%d%d%d]\n",
+                                                cpu, cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+                        } else if (per_cpu(tegra_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
+                                pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
+                                                cpu, tegra_mpdec_tuners_ins.pause);
+                                msleep(tegra_mpdec_tuners_ins.pause);
+                                was_paused = true;
+                        }
+                }
+		break;
+	case TEGRA_MPDEC_LPCPU_DOWN:
+                if (lp_up)
+                        if(tegra_lp_cpu_handler(false))
+                                pr_info(MPDEC_TAG" LPCPU powered down.\n");
+		break;
+	case TEGRA_MPDEC_LPCPU_UP:
+                if ((!lp_up) && (lp_possible()))
+                        if(tegra_lp_cpu_handler(true))
+                                pr_info(MPDEC_TAG" LPCPU powered up.\n");
 		break;
 	default:
 		pr_err(MPDEC_TAG"%s: invalid mpdec hotplug state %d\n",
@@ -305,9 +363,21 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 	mutex_unlock(&tegra_cpu_lock);
 
 out:
-	if (state != TEGRA_MPDEC_DISABLED)
-		schedule_delayed_work(&tegra_mpdec_work,
-				msecs_to_jiffies(tegra_mpdec_tuners_ins.delay));
+	if (state != TEGRA_MPDEC_DISABLED) {
+                switch (state) {
+	        case TEGRA_MPDEC_LPCPU_DOWN:
+                        schedule_delayed_work(&tegra_mpdec_work,
+                                msecs_to_jiffies(TEGRA_MPDEC_LPCPU_DOWNDELAY));
+                        break;
+	        case TEGRA_MPDEC_LPCPU_UP:
+                        schedule_delayed_work(&tegra_mpdec_work,
+                                msecs_to_jiffies(TEGRA_MPDEC_LPCPU_UPDELAY));
+		        break;
+                default:
+                        schedule_delayed_work(&tegra_mpdec_work,
+                                msecs_to_jiffies(tegra_mpdec_tuners_ins.delay));
+                }
+        }
 	return;
 }
 
@@ -610,6 +680,16 @@ static int __init tegra_mpdec(void)
 {
 	int cpu, rc, err = 0;
 
+	cpu_clk = clk_get_sys(NULL, "cpu");
+	cpu_g_clk = clk_get_sys(NULL, "cpu_g");
+	cpu_lp_clk = clk_get_sys(NULL, "cpu_lp");
+
+	if (IS_ERR(cpu_clk) || IS_ERR(cpu_g_clk) || IS_ERR(cpu_lp_clk))
+		return -ENOENT;
+
+	idle_top_freq = clk_get_max_rate(cpu_lp_clk) / 1000;
+	idle_bottom_freq = clk_get_min_rate(cpu_g_clk) / 1000;
+
 	for_each_possible_cpu(cpu) {
 		mutex_init(&(per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex));
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = false;
@@ -617,13 +697,6 @@ static int __init tegra_mpdec(void)
 	}
 
         was_paused = true;
-
-	cpu_clk = clk_get_sys(NULL, "cpu");
-	cpu_g_clk = clk_get_sys(NULL, "cpu_g");
-	cpu_lp_clk = clk_get_sys(NULL, "cpu_lp");
-
-	if (IS_ERR(cpu_clk) || IS_ERR(cpu_g_clk) || IS_ERR(cpu_lp_clk))
-		return -ENOENT;
 
 	INIT_DELAYED_WORK(&tegra_mpdec_work, tegra_mpdec_work_thread);
 	if (state != TEGRA_MPDEC_DISABLED)
