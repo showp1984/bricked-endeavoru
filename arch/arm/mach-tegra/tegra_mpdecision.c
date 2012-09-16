@@ -393,7 +393,6 @@ out:
 
 static void tegra_mpdec_early_suspend(struct early_suspend *h)
 {
-/* TODO: power down cpu0 and power up lp */
 	int cpu = nr_cpu_ids;
 	for_each_possible_cpu(cpu) {
 		mutex_lock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
@@ -406,20 +405,23 @@ static void tegra_mpdec_early_suspend(struct early_suspend *h)
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = true;
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
+        if (!lp_up)
+                if(tegra_lp_cpu_handler(true))
+                        pr_info(MPDEC_TAG" LPCPU powered up.\n");
 	pr_info(MPDEC_TAG"Screen -> off. Deactivated mpdecision.\n");
 }
 
 static void tegra_mpdec_late_resume(struct early_suspend *h)
 {
-/* TODO:
-   power down lp cpu and power up one hp cpu
-   afterwards let mpdecision decide if the hp is needed and revert to lp if it is not */
 	int cpu = nr_cpu_ids;
 	for_each_possible_cpu(cpu) {
 		mutex_lock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = false;
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
+        if (lp_up)
+                if(tegra_lp_cpu_handler(false))
+                        pr_info(MPDEC_TAG" LPCPU powered down.\n");
 	pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d%d%d%d]\n",
 			cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
 }
