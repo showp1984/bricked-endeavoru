@@ -12,7 +12,6 @@
  */
 /*
  * Qualcomm MSM Runqueue Stats Interface for Userspace
- * HTC modify for Tegra Runqueue Stats
  */
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -32,54 +31,23 @@
 #define DEFAULT_RQ_POLL_JIFFIES 1
 #define DEFAULT_DEF_TIMER_JIFFIES 5
 
+static unsigned init_done = 0;
+
 unsigned int get_rq_info(void)
 {
 	unsigned long flags = 0;
-	unsigned int rq = 0;
+        unsigned int rq = 0;
 
-	spin_lock_irqsave(&rq_lock, flags);
+        spin_lock_irqsave(&rq_lock, flags);
 
-	rq = rq_info.rq_avg;
-	rq_info.rq_avg = 0;
+        rq = rq_info.rq_avg;
+        rq_info.rq_avg = 0;
 
-	spin_unlock_irqrestore(&rq_lock, flags);
+        spin_unlock_irqrestore(&rq_lock, flags);
 
-	return rq;
+        return rq;
 }
 EXPORT_SYMBOL(get_rq_info);
-
-unsigned int set_rq_poll_ms(unsigned int poll_ms)
-{
-	unsigned long flags = 0;
-	static DEFINE_MUTEX(lock_poll_ms);
-
-	if (poll_ms < 0)
-		return 0;
-
-	mutex_lock(&lock_poll_ms);
-
-	spin_lock_irqsave(&rq_lock, flags);
-	rq_info.rq_poll_jiffies = msecs_to_jiffies(poll_ms);
-	spin_unlock_irqrestore(&rq_lock, flags);
-
-	mutex_unlock(&lock_poll_ms);
-
-	return 0;
-}
-EXPORT_SYMBOL(set_rq_poll_ms);
-
-unsigned int get_rq_poll_ms(void)
-{
-	int ret = 0;
-	unsigned long flags = 0;
-
-	spin_lock_irqsave(&rq_lock, flags);
-	ret = jiffies_to_msecs(rq_info.rq_poll_jiffies);
-	spin_unlock_irqrestore(&rq_lock, flags);
-
-	return ret;
-}
-EXPORT_SYMBOL(get_rq_poll_ms);
 
 static void def_work_fn(struct work_struct *work)
 {
@@ -90,7 +58,9 @@ static void def_work_fn(struct work_struct *work)
 	rq_info.def_interval = (unsigned int) diff;
 
 	/* Notify polling threads on change of value */
-	sysfs_notify(rq_info.kobj, NULL, "def_timer_ms");
+	/* HTC Change: call sysfs_notify only when init is done */
+	if (init_done)
+		sysfs_notify(rq_info.kobj, NULL, "def_timer_ms");
 }
 
 static ssize_t show_run_queue_avg(struct kobject *kobj,
@@ -163,7 +133,7 @@ static ssize_t store_def_timer_ms(struct kobject *kobj,
 	return count;
 }
 
-#define TEGRA_RQ_STATS_RO_ATTRIB(att) ({ \
+#define MSM_RQ_STATS_RO_ATTRIB(att) ({ \
 		struct attribute *attrib = NULL; \
 		struct kobj_attribute *ptr = NULL; \
 		ptr = kzalloc(sizeof(struct kobj_attribute), GFP_KERNEL); \
@@ -176,7 +146,7 @@ static ssize_t store_def_timer_ms(struct kobject *kobj,
 		} \
 		attrib; })
 
-#define TEGRA_RQ_STATS_RW_ATTRIB(att) ({ \
+#define MSM_RQ_STATS_RW_ATTRIB(att) ({ \
 		struct attribute *attrib = NULL; \
 		struct kobj_attribute *ptr = NULL; \
 		ptr = kzalloc(sizeof(struct kobj_attribute), GFP_KERNEL); \
@@ -205,9 +175,9 @@ static int init_rq_attribs(void)
 
 	rq_info.rq_avg = 0;
 
-	attribs[0] = TEGRA_RQ_STATS_RW_ATTRIB(def_timer_ms);
-	attribs[1] = TEGRA_RQ_STATS_RO_ATTRIB(run_queue_avg);
-	attribs[2] = TEGRA_RQ_STATS_RW_ATTRIB(run_queue_poll_ms);
+	attribs[0] = MSM_RQ_STATS_RW_ATTRIB(def_timer_ms);
+	attribs[1] = MSM_RQ_STATS_RO_ATTRIB(run_queue_avg);
+	attribs[2] = MSM_RQ_STATS_RW_ATTRIB(run_queue_poll_ms);
 	attribs[3] = NULL;
 
 	for (i = 0; i < attr_count - 1 ; i++) {
@@ -240,9 +210,8 @@ static int init_rq_attribs(void)
 		kobject_uevent(rq_info.kobj, KOBJ_ADD);
 
 	if (!err) {
-		rq_info.init = 1;
-		pr_info("%s: Initialize done. rq_info.init = %d\n",
-				__func__, rq_info.init);
+		pr_info("%s: Initialize done.\n", __func__);
+		init_done = 1;
 		return err;
 	}
 
@@ -258,8 +227,10 @@ rel:
 	return -ENOMEM;
 }
 
-static int __init tegra_rq_stats_init(void)
+static int __init msm_rq_stats_init(void)
 {
+	int ret;
+
 	rq_wq = create_singlethread_workqueue("rq_stats");
 	BUG_ON(!rq_wq);
 	INIT_WORK(&rq_info.def_timer_work, def_work_fn);
@@ -268,7 +239,9 @@ static int __init tegra_rq_stats_init(void)
 	rq_info.def_timer_jiffies = DEFAULT_DEF_TIMER_JIFFIES;
 	rq_info.rq_poll_last_jiffy = 0;
 	rq_info.def_timer_last_jiffy = 0;
-	return init_rq_attribs();
-}
-late_initcall(tegra_rq_stats_init);
+	ret = init_rq_attribs();
 
+	rq_info.init = 1;
+	return ret;
+}
+late_initcall(msm_rq_stats_init);

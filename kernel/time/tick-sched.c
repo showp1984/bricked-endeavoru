@@ -21,12 +21,10 @@
 #include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/rq_stats.h>
-#include <linux/cpu_debug.h>
 
 #include <asm/irq_regs.h>
 
 #include "tick-internal.h"
-
 
 struct rq_data rq_info;
 struct workqueue_struct *rq_wq;
@@ -748,11 +746,6 @@ static void update_rq_stats(void)
 		rq_info.rq_poll_last_jiffy = jiffies;
 
 		spin_unlock_irqrestore(&rq_lock, flags);
-
-		CPU_DEBUG_PRINTK(CPU_DEBUG_RQ,
-			" rq_stat is %u, total_ms=%u",
-			(unsigned int)rq_avg,
-			jiffies_to_msecs(rq_info.rq_poll_total_jiffies));
 	}
 }
 
@@ -815,7 +808,7 @@ static enum hrtimer_restart tick_sched_timer(struct hrtimer *timer)
 		update_process_times(user_mode(regs));
 		profile_tick(CPU_PROFILING);
 
-		if ((rq_info.init == 1) && (tick_do_timer_cpu == cpu)) {
+		if ((rq_info.init == 1) && (cpu == 0)) {
 
 			/*
 			 * update run queue statistics
