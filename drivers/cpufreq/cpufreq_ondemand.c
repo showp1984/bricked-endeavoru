@@ -669,7 +669,10 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 
 #else
 		if (counter < 5) {
-			counter++;
+                        if (num_online_cpus() > 1)
+                                counter++;
+                        else
+                                counter += 2;
 			if (counter > 2) {
 				/* change to busy phase */
 				phase = 1;
