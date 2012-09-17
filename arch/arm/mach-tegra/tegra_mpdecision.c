@@ -47,6 +47,10 @@
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             640000
 
+/* This will replace TEGRA_MPDEC_DELAY in each case.
+ * Though the values are currently identical do leave
+ * them here for future changes.
+ */
 #define TEGRA_MPDEC_LPCPU_UPDELAY         200
 #define TEGRA_MPDEC_LPCPU_DOWNDELAY       200
 
