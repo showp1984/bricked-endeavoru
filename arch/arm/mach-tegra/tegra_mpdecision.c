@@ -1,8 +1,11 @@
 /*
  * arch/arm/mach-tegra/tegra_mpdecision.c
  *
- * cpu auto-hotplug/unplug based on system load for tegra quadcore cpus
- * low power single core while screen is off
+ * This program features:
+ * -cpu auto-hotplug/unplug based on system load (runqueue) for tegra quadcore
+ *   -automatic decision wether to switch to low power core or not
+ * -low power single core while screen is off
+ * -extensive sysfs tuneables
  *
  * Copyright (c) 2012, Dennis Rassmann <showp1984@gmail.com>
  *
