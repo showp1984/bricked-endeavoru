@@ -97,7 +97,6 @@ extern unsigned int get_rq_info(void);
 
 unsigned int state = TEGRA_MPDEC_IDLE;
 bool was_paused = false;
-bool lp_up = false;
 
 static unsigned long get_rate(int cpu)
 {
@@ -198,7 +197,7 @@ static int mp_decision(void)
 		index = (nr_cpu_online - 1) * 2;
 		if ((nr_cpu_online < CONFIG_NR_CPUS) && (rq_depth >= NwNs_Threshold[index])) {
 			if (total_time >= TwTs_Threshold[index]) {
-                                if (!lp_up)
+                                if (!is_lp_cluster())
                                         new_state = TEGRA_MPDEC_UP;
                                 else if (get_rate(0) >= idle_top_freq)
                                         new_state = TEGRA_MPDEC_LPCPU_DOWN;
@@ -210,9 +209,9 @@ static int mp_decision(void)
 			if (total_time >= TwTs_Threshold[index+1] ) {
                                 if (nr_cpu_online > 1)
                                         new_state = TEGRA_MPDEC_DOWN;
-                                else if ((get_rate(0) <= idle_top_freq) && (!lp_up))
+                                else if ((get_rate(0) <= idle_top_freq) && (!is_lp_cluster()))
                                         new_state = TEGRA_MPDEC_LPCPU_UP;
-                                else if ((get_rate(0) <= idle_top_freq) && (lp_up))
+                                else if ((get_rate(0) <= idle_top_freq) && (is_lp_cluster()))
                                         new_state = TEGRA_MPDEC_IDLE;
 
 		                if (get_slowest_cpu_rate() > tegra_mpdec_tuners_ins.idle_freq)
@@ -250,7 +249,6 @@ static int tegra_lp_cpu_handler(bool state)
         case true:
                 if(!clk_set_parent(cpu_clk, cpu_lp_clk)) {
 		        pr_info(MPDEC_TAG" power up LPCPU");
-                        lp_up = true;
                 } else {
                         pr_err(MPDEC_TAG" %s (up): clk_set_parent fail\n", __func__);
                         err = true;
@@ -261,7 +259,6 @@ static int tegra_lp_cpu_handler(bool state)
         case false:
                 if (!clk_set_parent(cpu_clk, cpu_g_clk)) {
                         pr_info(MPDEC_TAG" power down LPCPU");
-                        lp_up = false;
                 } else {
                         pr_err(MPDEC_TAG" %s (down): clk_set_parent fail\n", __func__);
                         err = true;
@@ -350,7 +347,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 }
 		break;
 	case TEGRA_MPDEC_LPCPU_DOWN:
-                if (lp_up) {
+                if (is_lp_cluster()) {
                         lp_dcnt++;
                         if (lp_dcnt > 2) {
                                 if(!tegra_lp_cpu_handler(false))
@@ -360,7 +357,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 }
 		break;
 	case TEGRA_MPDEC_LPCPU_UP:
-                if ((!lp_up) && (lp_possible()))
+                if ((!is_lp_cluster()) && (lp_possible()))
                         lp_ucnt++;
                         if (lp_ucnt > 5) {
                                 if(!tegra_lp_cpu_handler(true))
@@ -407,7 +404,7 @@ static void tegra_mpdec_early_suspend(struct early_suspend *h)
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = true;
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
-        if (!lp_up)
+        if (!is_lp_cluster())
                 if(!tegra_lp_cpu_handler(true))
                         pr_info(MPDEC_TAG" LPCPU error, cannot power up.\n");
 	pr_info(MPDEC_TAG"Screen -> off. Deactivated mpdecision.\n");
@@ -421,7 +418,7 @@ static void tegra_mpdec_late_resume(struct early_suspend *h)
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = false;
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
-        if (lp_up)
+        if (is_lp_cluster())
                 if(!tegra_lp_cpu_handler(false))
                         pr_info(MPDEC_TAG" LPCPU error, cannot power down.\n");
 	pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d.%d%d%d%d]\n",
