@@ -43,7 +43,7 @@
 
 #define MPDEC_TAG                       "[MPDEC]: "
 #define TEGRA_MPDEC_STARTDELAY            20000
-#define TEGRA_MPDEC_DELAY                 100
+#define TEGRA_MPDEC_DELAY                 200
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             640000
 
