@@ -253,8 +253,6 @@ static int tegra_lp_cpu_handler(bool state)
                         pr_err(MPDEC_TAG" %s (up): clk_set_parent fail\n", __func__);
                         err = true;
                 }
-                /* catch-up with governor target speed */
-                tegra_cpu_set_speed_cap(NULL);
                 break;
         case false:
                 if (!clk_set_parent(cpu_clk, cpu_g_clk)) {
@@ -263,10 +261,11 @@ static int tegra_lp_cpu_handler(bool state)
                         pr_err(MPDEC_TAG" %s (down): clk_set_parent fail\n", __func__);
                         err = true;
                 }
-                /* catch-up with governor target speed */
-                tegra_cpu_set_speed_cap(NULL);
                 break;
         }
+
+        /* catch-up with governor target speed */
+        tegra_cpu_set_speed_cap(NULL);
 
         mutex_unlock(&tegra_lpcpu_lock);
 
