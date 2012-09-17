@@ -292,7 +292,7 @@ EXPORT_SYMBOL_GPL(mpdecision_gmode_notifier);
 static void tegra_mpdec_work_thread(struct work_struct *work)
 {
 	unsigned int cpu = nr_cpu_ids;
-        static int lp_dcnt = 0;
+        static int lp_req = 0;
 	cputime64_t on_time = 0;
         bool suspended = false;
 
@@ -361,18 +361,18 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 		break;
 	case TEGRA_MPDEC_LPCPU_DOWN:
                 if (is_lp_cluster()) {
-                        lp_dcnt++;
-                        if (lp_dcnt > 2) {
-                                if(!tegra_lp_cpu_handler(false, false))
-                                        pr_err(MPDEC_TAG" LPCPU error, cannot power down.\n");
-                                lp_dcnt = 0;
-                        }
+                        if(!tegra_lp_cpu_handler(false, false))
+                                pr_err(MPDEC_TAG" LPCPU error, cannot power down.\n");
                 }
 		break;
 	case TEGRA_MPDEC_LPCPU_UP:
                 if ((!is_lp_cluster()) && (lp_possible()))
-                        if(!tegra_lp_cpu_handler(true, false))
-                                pr_err(MPDEC_TAG" LPCPU error, cannot power up.\n");
+                        lp_req++;
+                        if (lp_req > 2) {
+                                if(!tegra_lp_cpu_handler(true, false))
+                                        pr_err(MPDEC_TAG" LPCPU error, cannot power up.\n");
+                                lp_req = 0;
+                        }
 		break;
 	default:
 		pr_err(MPDEC_TAG"%s: invalid mpdec hotplug state %d\n",
