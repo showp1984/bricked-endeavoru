@@ -360,7 +360,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 	case TEGRA_MPDEC_LPCPU_UP:
                 if ((!lp_up) && (lp_possible()))
                         lp_ucnt++;
-                        if (lp_ucnt > 2) {
+                        if (lp_ucnt > 5) {
                                 if(tegra_lp_cpu_handler(true))
                                         pr_info(MPDEC_TAG" LPCPU powered up.\n");
                                 lp_ucnt = 0;
