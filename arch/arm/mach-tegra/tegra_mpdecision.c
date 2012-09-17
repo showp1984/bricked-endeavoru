@@ -367,8 +367,11 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 		break;
 	case TEGRA_MPDEC_LPCPU_UP:
                 if ((!is_lp_cluster()) && (lp_possible()))
+                        /* hysteresis loop for lpcpu powerup
+                           this prevents the lpcpu to kick in too early and produce lags
+                           we need at least 6 requests in order to power up the lpcpu */
                         lp_req++;
-                        if (lp_req > 2) {
+                        if (lp_req > 5) {
                                 if(!tegra_lp_cpu_handler(true, false))
                                         pr_err(MPDEC_TAG" LPCPU error, cannot power up.\n");
                                 lp_req = 0;
