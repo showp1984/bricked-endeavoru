@@ -210,8 +210,10 @@ static int mp_decision(void)
 			if (total_time >= TwTs_Threshold[index+1] ) {
                                 if (nr_cpu_online > 1)
                                         new_state = TEGRA_MPDEC_DOWN;
-                                else if (get_rate(0) <= idle_top_freq)
+                                else if ((get_rate(0) <= idle_top_freq) && (!lp_up))
                                         new_state = TEGRA_MPDEC_LPCPU_UP;
+                                else if ((get_rate(0) <= idle_top_freq) && (lp_up))
+                                        new_state = TEGRA_MPDEC_IDLE;
 
 		                if (get_slowest_cpu_rate() > tegra_mpdec_tuners_ins.idle_freq)
                                         new_state = TEGRA_MPDEC_IDLE;
