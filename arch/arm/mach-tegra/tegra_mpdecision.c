@@ -353,8 +353,8 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 if (lp_up) {
                         lp_dcnt++;
                         if (lp_dcnt > 2) {
-                                if(tegra_lp_cpu_handler(false))
-                                        pr_info(MPDEC_TAG" LPCPU powered down.\n");
+                                if(!tegra_lp_cpu_handler(false))
+                                        pr_err(MPDEC_TAG" LPCPU error, cannot power down.\n");
                                 lp_dcnt = 0;
                         }
                 }
@@ -363,8 +363,8 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 if ((!lp_up) && (lp_possible()))
                         lp_ucnt++;
                         if (lp_ucnt > 5) {
-                                if(tegra_lp_cpu_handler(true))
-                                        pr_info(MPDEC_TAG" LPCPU powered up.\n");
+                                if(!tegra_lp_cpu_handler(true))
+                                        pr_err(MPDEC_TAG" LPCPU error, cannot power up.\n");
                                 lp_ucnt = 0;
                         }
 		break;
@@ -408,8 +408,8 @@ static void tegra_mpdec_early_suspend(struct early_suspend *h)
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
         if (!lp_up)
-                if(tegra_lp_cpu_handler(true))
-                        pr_info(MPDEC_TAG" LPCPU powered up.\n");
+                if(!tegra_lp_cpu_handler(true))
+                        pr_info(MPDEC_TAG" LPCPU error, cannot power up.\n");
 	pr_info(MPDEC_TAG"Screen -> off. Deactivated mpdecision.\n");
 }
 
@@ -422,8 +422,8 @@ static void tegra_mpdec_late_resume(struct early_suspend *h)
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
         if (lp_up)
-                if(tegra_lp_cpu_handler(false))
-                        pr_info(MPDEC_TAG" LPCPU powered down.\n");
+                if(!tegra_lp_cpu_handler(false))
+                        pr_info(MPDEC_TAG" LPCPU error, cannot power down.\n");
 	pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d.%d%d%d%d]\n",
 			is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
 }
