@@ -55,6 +55,8 @@ extern unsigned long long wake_reason_resume;
 static spinlock_t user_cap_lock;
 struct work_struct htc_suspend_resume_work;
 
+/* mpdecision notifier */
+extern void mpdecision_gmode_notifier(void);
 
 /* tegra throttling and edp governors require frequencies in the table
    to be in ascending order */
@@ -563,7 +565,13 @@ int tegra_update_cpu_speed(unsigned long rate)
 			ret = clk_set_rate(cpu_clk, 475000 * 1000);
 
 			/* change to g mode */
-			clk_set_parent(cpu_clk, cpu_g_clk);
+			//clk_set_parent(cpu_clk, cpu_g_clk);
+                        /*
+                         * the above variant is now no longer preferred since
+                         * mpdecision would not know about this. Notify mpdecision
+                         * instead to switch to G mode
+                         */
+                        mpdecision_gmode_notifier();
 
 			/* restore the target frequency, and
 			 * let the rest of the function handle
