@@ -241,7 +241,8 @@ static int mp_decision(void)
 
 #if DEBUG
         pr_info(MPDEC_TAG"[DEBUG] rq: %u, new_state: %i | Mask=[%d.%d%d%d%d]\n",
-		         rq_depth, new_state, is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+                rq_depth, new_state, is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                cpu_online(1), cpu_online(2), cpu_online(3));
 #endif
 	return new_state;
 }
@@ -259,7 +260,8 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
         case true:
                 if(!clk_set_parent(cpu_clk, cpu_lp_clk)) {
                         pr_info(MPDEC_TAG"CPU[LP] off->on | Mask=[%d.%d%d%d%d]\n",
-                                is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+                                is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                                cpu_online(1), cpu_online(2), cpu_online(3));
                         tegra_mpdec_lpcpudata.on_time = ktime_to_ms(ktime_get());
                         tegra_mpdec_lpcpudata.online = true;
                 } else {
@@ -275,10 +277,12 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
                         /* was this called because the freq is too high for the lpcpu? */
                         if (!notifier)
                                 pr_info(MPDEC_TAG"CPU[LP] on->off | Mask=[%d.%d%d%d%d] | time on: %llu\n",
-                                        is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3), on_time);
+                                        is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                                        cpu_online(1), cpu_online(2), cpu_online(3), on_time);
                         else
                                 pr_info(MPDEC_TAG"CPU[LP] on->off (freq) | Mask=[%d.%d%d%d%d] | time on: %llu\n",
-                                        is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3), on_time);
+                                        is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                                        cpu_online(1), cpu_online(2), cpu_online(3), on_time);
                 } else {
                         pr_err(MPDEC_TAG" %s (down): clk_set_parent fail\n", __func__);
                         err = true;
@@ -348,10 +352,11 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                                 per_cpu(tegra_mpdec_cpudata, cpu).online = false;
                                 on_time = ktime_to_ms(ktime_get()) - per_cpu(tegra_mpdec_cpudata, cpu).on_time;
                                 pr_info(MPDEC_TAG"CPU[%d] on->off | Mask=[%d.%d%d%d%d] | time on: %llu\n",
-                                                cpu, is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3), on_time);
+                                        cpu, is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                                        cpu_online(1), cpu_online(2), cpu_online(3), on_time);
                         } else if (per_cpu(tegra_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
                                 pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
-                                                cpu, tegra_mpdec_tuners_ins.pause);
+                                        cpu, tegra_mpdec_tuners_ins.pause);
                                 msleep(tegra_mpdec_tuners_ins.pause);
                                 was_paused = true;
                         }
@@ -365,10 +370,11 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                                 per_cpu(tegra_mpdec_cpudata, cpu).online = true;
                                 per_cpu(tegra_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
                                 pr_info(MPDEC_TAG"CPU[%d] off->on | Mask=[%d.%d%d%d%d]\n",
-                                                cpu, is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+                                        cpu, is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                                        cpu_online(1), cpu_online(2), cpu_online(3));
                         } else if (per_cpu(tegra_mpdec_cpudata, cpu).online != cpu_online(cpu)) {
                                 pr_info(MPDEC_TAG"CPU[%d] was controlled outside of mpdecision! | pausing [%d]ms\n",
-                                                cpu, tegra_mpdec_tuners_ins.pause);
+                                        cpu, tegra_mpdec_tuners_ins.pause);
                                 msleep(tegra_mpdec_tuners_ins.pause);
                                 was_paused = true;
                         }
@@ -425,7 +431,8 @@ static void tegra_mpdec_early_suspend(struct early_suspend *h)
 		if ((cpu >= 1) && (cpu_online(cpu))) {
                         cpu_down(cpu);
                         pr_info(MPDEC_TAG"Screen -> off. Suspended CPU[%d] | Mask=[%d.%d%d%d%d]\n",
-                                        cpu, is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+                                cpu, is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                                cpu_online(1), cpu_online(2), cpu_online(3));
 			per_cpu(tegra_mpdec_cpudata, cpu).online = false;
 		}
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = true;
@@ -449,7 +456,8 @@ static void tegra_mpdec_late_resume(struct early_suspend *h)
                 if(!tegra_lp_cpu_handler(false, false))
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
 	pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d.%d%d%d%d]\n",
-			is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+                is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                cpu_online(1), cpu_online(2), cpu_online(3));
 }
 
 static struct early_suspend tegra_mpdec_early_suspend_handler = {
@@ -661,7 +669,8 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
 			per_cpu(tegra_mpdec_cpudata, cpu).online = true;
 			cpu_up(cpu);
 			pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d.%d%d%d%d]\n",
-					 cpu, is_lp_cluster(), cpu_online(0), cpu_online(1), cpu_online(2), cpu_online(3));
+                                cpu, is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                                cpu_online(1), cpu_online(2), cpu_online(3));
 		} else {
 			pr_info(MPDEC_TAG"nap time...\n");
 		}
