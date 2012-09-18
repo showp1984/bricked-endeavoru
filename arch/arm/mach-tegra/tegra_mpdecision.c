@@ -336,6 +336,10 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 			else if (!cpu_online(cpu))
 				per_cpu(tegra_mpdec_cpudata, cpu).online = false;
 		}
+                if (is_lp_cluster())
+                        tegra_mpdec_lpcpudata.online = true;
+                else
+                        tegra_mpdec_lpcpudata.online = false;
 		was_paused = false;
 	}
 
