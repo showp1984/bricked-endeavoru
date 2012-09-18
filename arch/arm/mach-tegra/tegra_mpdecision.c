@@ -663,17 +663,22 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
 	switch (buf[0]) {
 	case '0':
 		state = TEGRA_MPDEC_DISABLED;
-		cpu = (CONFIG_NR_CPUS - 1);
-		if (!cpu_online(cpu)) {
-			per_cpu(tegra_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
-			per_cpu(tegra_mpdec_cpudata, cpu).online = true;
-			cpu_up(cpu);
-			pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d.%d%d%d%d]\n",
-                                cpu, is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
-                                cpu_online(1), cpu_online(2), cpu_online(3));
-		} else {
-			pr_info(MPDEC_TAG"nap time...\n");
-		}
+                pr_info(MPDEC_TAG"nap time... Hot plugging offline CPUs...\n");
+
+                if (is_lp_cluster())
+                        if(!tegra_lp_cpu_handler(false, false))
+                                pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
+
+                for (cpu = 1; cpu < CONFIG_NR_CPUS; cpu++) {
+                        if (!cpu_online(cpu)) {
+                                per_cpu(tegra_mpdec_cpudata, cpu).on_time = ktime_to_ms(ktime_get());
+                                per_cpu(tegra_mpdec_cpudata, cpu).online = true;
+                                cpu_up(cpu);
+                                pr_info(MPDEC_TAG"nap time... Hot plugged CPU[%d] | Mask=[%d.%d%d%d%d]\n",
+                                        cpu, is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
+                                        cpu_online(1), cpu_online(2), cpu_online(3));
+                        }
+                }
 		break;
 	case '1':
 		state = TEGRA_MPDEC_IDLE;
