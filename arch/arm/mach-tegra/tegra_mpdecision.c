@@ -46,7 +46,7 @@
 
 #define MPDEC_TAG                       "[MPDEC]: "
 #define TEGRA_MPDEC_STARTDELAY            20000
-#define TEGRA_MPDEC_DELAY                 200
+#define TEGRA_MPDEC_DELAY                 150
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             475000
 #define TEGRA_MPDEC_LPCPU_RQ_DOWN         36
@@ -55,8 +55,8 @@
  * Though the values are currently identical do leave
  * them here for future changes.
  */
-#define TEGRA_MPDEC_LPCPU_UPDELAY         200
-#define TEGRA_MPDEC_LPCPU_DOWNDELAY       200
+#define TEGRA_MPDEC_LPCPU_UPDELAY         TEGRA_MPDEC_DELAY
+#define TEGRA_MPDEC_LPCPU_DOWNDELAY       TEGRA_MPDEC_DELAY
 
 enum {
 	TEGRA_MPDEC_DISABLED = 0,
