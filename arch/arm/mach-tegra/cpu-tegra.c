@@ -1041,8 +1041,8 @@ static void htc_suspend_resume_worker(struct work_struct *w)
 			(s32)PM_QOS_CPU_FREQ_MAX_DEFAULT_VALUE);
 	pr_info("Release early suspend CPU cap by RIL!");
 
-	pm_qos_update_request(&boost_cpu_freq_req, saved_policy_max);
-	tegra_update_cpu_speed(saved_policy_max);
+	pm_qos_update_request(&boost_cpu_freq_req, (s32)BOOST_CPU_FREQ_MIN);
+	tegra_update_cpu_speed(BOOST_CPU_FREQ_MIN);
 	pr_info("tegra_cpufreq_powersave_late_resume:"
 		" boost cpu freq to 1.5GHz by RIL\n");
 }
