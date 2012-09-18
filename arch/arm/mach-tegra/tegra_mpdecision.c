@@ -49,11 +49,12 @@
 #define TEGRA_MPDEC_DELAY                 150
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             475000
+
+/* This rq value will be used if we only have the lpcpu online */
 #define TEGRA_MPDEC_LPCPU_RQ_DOWN         36
 
-/* This will replace TEGRA_MPDEC_DELAY in each case.
- * Though the values are currently identical do leave
- * them here for future changes.
+/* This will replace TEGRA_MPDEC_DELAY in each case. Though the
+ * values are identical do leave them here for future changes.
  */
 #define TEGRA_MPDEC_LPCPU_UPDELAY         TEGRA_MPDEC_DELAY
 #define TEGRA_MPDEC_LPCPU_DOWNDELAY       TEGRA_MPDEC_DELAY
@@ -412,6 +413,8 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 
 out:
 	if (state != TEGRA_MPDEC_DISABLED) {
+                /* This is being used if the lpcpu up/down delay values are different
+                 * than the default mpdecision delay. */
                 switch (state) {
 	        case TEGRA_MPDEC_LPCPU_DOWN:
                         schedule_delayed_work(&tegra_mpdec_work,
@@ -432,6 +435,7 @@ out:
 static void tegra_mpdec_early_suspend(struct early_suspend *h)
 {
 	int cpu = nr_cpu_ids;
+        /* power down all cpus except 0 and switch to lp mode */
 	for_each_possible_cpu(cpu) {
 		mutex_lock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 		if ((cpu >= 1) && (cpu_online(cpu))) {
@@ -458,6 +462,7 @@ static void tegra_mpdec_late_resume(struct early_suspend *h)
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = false;
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
+        /* always switch back to g mode on resume */
         if (is_lp_cluster())
                 if(!tegra_lp_cpu_handler(false, false))
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
