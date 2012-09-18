@@ -49,6 +49,7 @@
 #define TEGRA_MPDEC_DELAY                 200
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             475000
+#define TEGRA_MPDEC_LPCPU_RQ_DOWN         36
 
 /* This will replace TEGRA_MPDEC_DELAY in each case.
  * Though the values are currently identical do leave
@@ -207,11 +208,12 @@ static int mp_decision(void)
 			if (total_time >= TwTs_Threshold[index]) {
                                 if (!is_lp_cluster())
                                         new_state = TEGRA_MPDEC_UP;
-                                else if (get_rate(0) >= idle_top_freq)
+                                else if (rq_depth > TEGRA_MPDEC_LPCPU_RQ_DOWN)
                                         new_state = TEGRA_MPDEC_LPCPU_DOWN;
 
-                                if (get_slowest_cpu_rate() <= tegra_mpdec_tuners_ins.idle_freq)
-                                        new_state = TEGRA_MPDEC_IDLE;
+                                if ((get_slowest_cpu_rate() <= tegra_mpdec_tuners_ins.idle_freq)
+                                     && (new_state != TEGRA_MPDEC_LPCPU_DOWN))
+                                                new_state = TEGRA_MPDEC_IDLE;;
 			}
 		} else if (rq_depth <= NwNs_Threshold[index+1]) {
 			if (total_time >= TwTs_Threshold[index+1] ) {
