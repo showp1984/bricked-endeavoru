@@ -1238,7 +1238,7 @@ static int __init tegra_pcie_init(void)
 	return err;
 }
 
-static int tegra_pci_probe(struct platform_device *pdev)
+static int __init tegra_pci_probe(struct platform_device *pdev)
 {
 	int ret;
 	struct pci_dev *dev = NULL;
@@ -1353,7 +1353,7 @@ static const struct dev_pm_ops tegra_pci_pm_ops = {
 	};
 #endif
 
-static struct platform_driver tegra_pci_driver = {
+static struct platform_driver tegra_pci_driver __refdata = {
 	.probe   = tegra_pci_probe,
 	.remove  = tegra_pci_remove,
 	.driver  = {
