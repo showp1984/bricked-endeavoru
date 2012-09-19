@@ -830,7 +830,7 @@ static struct pm_qos_request_list cap_cpu_freq_req;
 #endif
 static int enter_early_suspend = 0;
 static int perf_early_suspend = 0;
-static int CAP_CPU_FREQ_TARGET = tegra_pmqos_boost_freq;
+static int CAP_CPU_FREQ_TARGET = 1500000;
 
 
 static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
