@@ -783,17 +783,14 @@ EXPORT_SYMBOL(rfkill_resume_polling);
 
 static int rfkill_suspend(struct device *dev, pm_message_t state)
 {
-#if 0
 	struct rfkill *rfkill = to_rfkill(dev);
 
 	rfkill_pause_polling(rfkill);
-#endif
 	return 0;
 }
 
 static int rfkill_resume(struct device *dev)
 {
-#if 0
 	struct rfkill *rfkill = to_rfkill(dev);
 	bool cur;
 
@@ -803,7 +800,6 @@ static int rfkill_resume(struct device *dev)
 	}
 
 	rfkill_resume_polling(rfkill);
-#endif
 	return 0;
 }
 #endif
