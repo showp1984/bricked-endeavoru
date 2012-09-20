@@ -1383,45 +1383,42 @@ void cpufreq_restore_governor(void)
 
 	cpufreq_set_governor(cpufreq_gov_default);
 
-	if (strncmp(cpufreq_gov_default, "ondemand",
-				strlen("ondemand")) == 0) {
-
 #ifdef CONFIG_TEGRA3_VARIANT_CPU_OVERCLOCK
-		switch (cpu_process_id) {
-			case 3:
-				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
-					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V3);
-				break;
-			case 2:
-				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
-					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V2);
-				break;
+	switch (cpu_process_id) {
+		case 3:
+			set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
+				"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V3);
+			break;
+		case 2:
+			set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
+				"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V2);
+			break;
 #ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
-			case 1:
-			case 0:
-				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
-					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V1);
-				if (cpu_process_id == 0)
-					pr_warn("Overclock: Variant Override Activated!\n");
-				break;
+		case 1:
+		case 0:
+			set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
+				"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V1);
+			if (cpu_process_id == 0)
+				pr_warn("Overclock: Variant Override Activated!\n");
+			break;
 #else
-			case 1:
-				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
-					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V1);
-				break;
-			case 0:
+		case 1:
+			set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
+				"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ_V1);
+			break;
+		case 0:
 #endif
-			default:
-				set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
-					"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ);
-				break;
-		}
-#else
-		set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
+		default:
+			set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
 				"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ);
+			break;
+	}
+#else
+	set_sysfs_param("/sys/devices/system/cpu/cpu0/cpufreq/",
+			"scaling_max_freq", CPUFREQ_SCALING_MAX_FREQ);
 #endif
 
-	} else if (strncmp(cpufreq_gov_default,INTERACTIVE_GOVERNOR,
+	if (strncmp(cpufreq_gov_default,INTERACTIVE_GOVERNOR,
 				strlen(INTERACTIVE_GOVERNOR)) == 0) {
 		set_governor_param(INTERACTIVE_GOVERNOR, BOOST_FACTOR,
 					saved_boost_factor);
