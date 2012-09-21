@@ -442,10 +442,10 @@ config TEGRA_EMC_TO_DDR_CLOCK
 	default "1"
 
 config TEGRA3_VARIANT_CPU_OVERCLOCK
-	bool "CPU Overclocking"
-	default n
-	help
-	  CPU Overclocking option
+        bool "CPU Overclocking"
+        default n
+        help
+          CPU Overclocking option
 
 config TEGRA3_VARIANT_OVERRIDE
 	bool "Variant Overclocking Override"
@@ -460,11 +460,12 @@ config TEGRA3_GAMING_FIX
 	help
 	  CPU Limiter for Quadcore Gaming
 
-config TEGRA_3D_GPU_OVERCLOCK
-	bool "GPU 3D Overclocking"
+config TEGRA_GPU_OVERCLOCK
+	bool "Tegra3: Enable GPU OC"
+	depends on TEGRA_SILICON_PLATFORM
 	default n
 	help
-	  GPU 3D Overclocking option
+	  Choose y to oc the GPU.
 
 config TEGRA_LEGACY_AUDIO
 	bool "Enable Tegra Legacy Audio APIs"
