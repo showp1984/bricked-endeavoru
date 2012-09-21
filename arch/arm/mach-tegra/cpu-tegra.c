@@ -980,10 +980,6 @@ static void tegra_cpufreq_late_resume(struct early_suspend *h)
 {
         pr_info("tegra_cpufreq_late_resume: clean cpu freq cap\n");
         pm_qos_update_request(&cap_cpu_freq_req, (s32)PM_QOS_CPU_FREQ_MAX_DEFAULT_VALUE);
-        pr_info("tegra_cpufreq_late_resume: boost cpu freq to %u\n",
-                tegra_pmqos_boost_freq);
-        pm_qos_update_request(&boost_cpu_freq_req, (s32)tegra_pmqos_boost_freq);
-        tegra_update_cpu_speed(tegra_pmqos_boost_freq);
 }
 #endif
 
