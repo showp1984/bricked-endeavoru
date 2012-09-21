@@ -273,7 +273,6 @@ struct kim_data_s {
 	unsigned long baud_rate;
 	//wakelock
 	struct wake_lock ST_wakelock;
-	unsigned char rfkilltool;
 };
 
 /**

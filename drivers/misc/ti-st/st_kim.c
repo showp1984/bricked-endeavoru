@@ -65,7 +65,6 @@ static struct rfkill_ops wl127x_rfkill_ops = {
 /* rfkill define end */
 
 static struct platform_device *st_kim_devices[MAX_ST_DEVICES];
-static int rfkilltool_on = 0;
 
 /**********************************************************************/
 /* internal functions */
@@ -648,23 +647,6 @@ static ssize_t show_install(struct device *dev,
 	return sprintf(buf, "%d\n", kim_data->ldisc_install);
 }
 
-static ssize_t show_rfkilltool(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct kim_data_s *kim_data = dev_get_drvdata(dev);
-	return sprintf(buf, "%d\n", rfkilltool_on);
-}
-
-static ssize_t store_rfkilltool(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct kim_data_s *kim_data = dev_get_drvdata(dev);
-	kim_data->rfkilltool = 1;
-	rfkilltool_on = 1;
-	pr_info("set store_rfkilltool on\n");
-	return kim_data->rfkilltool;
-}
-
 static ssize_t show_dev_name(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -699,15 +681,11 @@ __ATTR(baud_rate, 0444, (void *)show_baud_rate, NULL);
 static struct kobj_attribute uart_flow_cntrl =
 __ATTR(flow_cntrl, 0444, (void *)show_flow_cntrl, NULL);
 
-static struct kobj_attribute rfkilltool =
-__ATTR(rfkilltool, 0644, (void *)show_rfkilltool, (void *)store_rfkilltool);
-
 static struct attribute *uim_attrs[] = {
 	&ldisc_install.attr,
 	&uart_dev_name.attr,
 	&uart_baud_rate.attr,
 	&uart_flow_cntrl.attr,
-        &rfkilltool.attr,
 	NULL,
 };
 
@@ -976,10 +954,6 @@ static int wl127x_set_power(void *data, bool blocked)
 static void wl127x_config_bt_off()
 {
 	pr_info("wl127x_config_bt_off: Entering\n");
-        if (rfkilltool_on == 0) {
-                pr_info("wl127x_config_bt_off, rfkilltool_on off\n");
-                return;
-        }
 
         blue_pincfg_uartc_suspend();
 	mdelay(1);
@@ -998,10 +972,6 @@ static void wl127x_config_bt_off()
 static void wl127x_config_bt_on()
 {
 	pr_info("wl127x_config_bt_on: Entering\n");
-	if (rfkilltool_on == 0) {
-		pr_info("wl127x_config_bt_on, rfkilltool_on off\n");
-		return;
-	}
 	//Avoid change rfkill state after boot up 
 	if ((rfkill_counter != 0) && (get_suspend_state() == PM_SUSPEND_ON) && (!after_BT_GPS_on)) {
 		long err = 0;

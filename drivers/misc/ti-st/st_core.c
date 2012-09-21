@@ -553,11 +553,11 @@ long st_register(struct st_proto_s *new_proto)
 		set_bit(ST_REG_IN_PROGRESS, &st_gdata->st_state);
 		st_recv = st_kim_recv;
 
-		/* release lock previously held - re-locked below */
-		spin_unlock_irqrestore(&st_gdata->lock, flags);
-
 		/* enable the ST LL - to set default chip state */
 		st_ll_enable(st_gdata);
+
+		/* release lock previously held - re-locked below */
+		spin_unlock_irqrestore(&st_gdata->lock, flags);
 
 		/* this may take a while to complete
 		 * since it involves BT fw download
@@ -569,6 +569,7 @@ long st_register(struct st_proto_s *new_proto)
 			    (test_bit(ST_REG_PENDING, &st_gdata->st_state))) {
 				pr_err(" KIM failure complete callback \n");
 				st_reg_complete(st_gdata, err);
+				clear_bit(ST_REG_PENDING, &st_gdata->st_state);
 			}
 			return -EINVAL;
 		}
