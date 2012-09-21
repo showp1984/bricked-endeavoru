@@ -306,8 +306,16 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
 
 void mpdecision_gmode_notifier(void)
 {
+        /* if we are suspended, don't switch to gmode */
+        if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
+                pr_err(MPDEC_TAG"CPU[LP] freq override: we are suspended!"
+                       " Don't switch to gmode.\n");
+                return;
+        }
+
         if(!tegra_lp_cpu_handler(false, true))
                 pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
+        return;
 }
 EXPORT_SYMBOL_GPL(mpdecision_gmode_notifier);
 
