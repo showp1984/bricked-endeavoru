@@ -11,7 +11,7 @@
 unsigned int get_cpu_debug(void);
 
 #define CPU_DEBUG_PRINTK(flag, fmt, ...)				\
-	if (get_cpu_debug() & flag) {					\
+	if (flag) {					\
 		pr_info(CPU_DEBUG_TAG pr_fmt(fmt), ##__VA_ARGS__);	\
 	}								\
 
