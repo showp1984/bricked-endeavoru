@@ -466,20 +466,6 @@ config TEGRA_3D_GPU_OVERCLOCK
 	help
 	  GPU 3D Overclocking option
 
-config TEGRA_INTERACTIVE_GOV_ON_EARLY_SUSPEND
-	bool "Use interactive cpu frequency governor when device enters early suspend"
-	depends on HAS_EARLYSUSPEND && CPU_FREQ && !TEGRA_CONSERVATIVE_GOV_ON_EARLY_SUSPEND
-	default y
-	help
-	 Also will restore to original cpu frequency governor when device is resumed
-
-config TEGRA_CONSERVATIVE_GOV_ON_EARLY_SUSPEND
-	bool "Use conservative cpu frequency governor when device enters early suspend"
-	depends on HAS_EARLYSUSPEND && CPU_FREQ
-	default n
-	help
-	 Also will restore to original cpu frequency governor when device is resumed
-
 config TEGRA_LEGACY_AUDIO
 	bool "Enable Tegra Legacy Audio APIs"
 	default n
