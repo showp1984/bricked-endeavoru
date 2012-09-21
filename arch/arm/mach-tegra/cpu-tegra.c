@@ -819,17 +819,6 @@ _out:
 	return ret;
 }
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-/* put early_suspend/late_resume handlers here for the display in order
- * to keep the code out of the display driver, keeping it closer to upstream
- */
-struct early_suspend tegra_cpufreq_powersave_early_suspender;
-struct early_suspend tegra_cpufreq_performance_early_suspender;
-static struct pm_qos_request_list boost_cpu_freq_req;
-static struct pm_qos_request_list cap_cpu_freq_req;
-#endif
-
-
 static int tegra_pm_notify(struct notifier_block *nb, unsigned long event,
 	void *dummy)
 {
@@ -946,18 +935,6 @@ static struct freq_attr *tegra_cpufreq_attr[] = {
 	NULL,
 };
 
-static int tegra_cpufreq_suspend(struct cpufreq_policy *policy)
-{
-	return 0;
-}
-static int tegra_cpufreq_resume(struct cpufreq_policy *policy)
-{
-	/*if it's a power key wakeup, uncap the cpu powersave mode for future boost*/
-	if (wake_reason_resume == 0x80)
-		policy->max = tegra_pmqos_boost_freq;
-	return 0;
-}
-
 static struct cpufreq_driver tegra_cpufreq_driver = {
 	.verify		= tegra_verify_speed,
 	.target		= tegra_target,
@@ -966,66 +943,7 @@ static struct cpufreq_driver tegra_cpufreq_driver = {
 	.exit		= tegra_cpu_exit,
 	.name		= "tegra",
 	.attr		= tegra_cpufreq_attr,
-	.suspend	= tegra_cpufreq_suspend,
-	.resume	= tegra_cpufreq_resume,
 };
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-
-static void tegra_cpufreq_powersave_early_suspend(struct early_suspend *h)
-{
-        pr_info("tegra_cpufreq_powersave_early_suspend: cap cpu freq to %u\n",
-		tegra_pmqos_cap_freq);
-        pm_qos_update_request(&cap_cpu_freq_req, (s32)tegra_pmqos_cap_freq);
-
-#ifdef CONFIG_TEGRA_CONSERVATIVE_GOV_ON_EARLY_SUSPEND
-	cpufreq_save_governor();
-	cpufreq_set_governor(CONSERVATIVE_GOVERNOR);
-	cpufreq_set_governor_param(CONSERVATIVE_GOVERNOR, UP_THRESHOLD,
-					UP_THRESHOLD_VALUE);
-	cpufreq_set_governor_param(CONSERVATIVE_GOVERNOR, DOWN_THRESHOLD,
-					DOWN_THRESHOLD_VALUE);
-	cpufreq_set_governor_param(CONSERVATIVE_GOVERNOR, FREQ_STEP,
-					FREQ_STEP_VALUE);
-#elif defined CONFIG_TEGRA_INTERACTIVE_GOV_ON_EARLY_SUSPEND
-	cpufreq_save_governor();
-	cpufreq_set_governor(INTERACTIVE_GOVERNOR);
-	cpufreq_set_governor_param(INTERACTIVE_GOVERNOR, BOOST_FACTOR,
-					BOOST_FACTOR_VALUE);
-	cpufreq_set_governor_param(INTERACTIVE_GOVERNOR, GO_MAXSPEED_LOAD,
-					GO_MAXSPEED_LOAD_VALUE);
-	cpufreq_set_governor_param(INTERACTIVE_GOVERNOR, MAX_BOOST,
-					MAX_BOOST_VALUE);
-	cpufreq_set_governor_param(INTERACTIVE_GOVERNOR, SUSTAIN_LOAD,
-					SUSTAIN_LOAD_VALUE);
-#endif
-
-}
-static void tegra_cpufreq_powersave_late_resume(struct early_suspend *h)
-{
-	pr_info("tegra_cpufreq_powersave_late_resume: clean cpu freq cap\n");
-	pm_qos_update_request(&cap_cpu_freq_req, (s32)PM_QOS_CPU_FREQ_MAX_DEFAULT_VALUE);
-	pr_info("tegra_cpufreq_powersave_late_resume: boost cpu freq to %u\n",
-                tegra_pmqos_boost_freq);
-	pm_qos_update_request(&boost_cpu_freq_req, (s32)tegra_pmqos_boost_freq);
-	tegra_update_cpu_speed(tegra_pmqos_boost_freq);
-}
-static void tegra_cpufreq_performance_early_suspend(struct early_suspend *h)
-{
-	pr_info("tegra_cpufreq_performance_early_suspend: Do nothing\n");
-}
-static void tegra_cpufreq_performance_late_resume(struct early_suspend *h)
-{
-	pr_info("tegra_cpufreq_performance_late_resume: clean cpu freq boost\n");
-	pm_qos_update_request(&boost_cpu_freq_req, (s32)PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
-
-#if defined CONFIG_TEGRA_CONSERVATIVE_GOV_ON_EARLY_SUSPEND \
-	|| defined CONFIG_TEGRA_INTERACTIVE_GOV_ON_EARLY_SUSPEND
-	cpufreq_restore_governor();
-#endif
-}
-
-#endif
 
 static void htc_suspend_resume_worker(struct work_struct *w)
 {
@@ -1035,7 +953,7 @@ static void htc_suspend_resume_worker(struct work_struct *w)
 
 	pm_qos_update_request(&boost_cpu_freq_req, (s32)tegra_pmqos_boost_freq);
 	tegra_update_cpu_speed(tegra_pmqos_boost_freq);
-	pr_info("tegra_cpufreq_powersave_late_resume:"
+	pr_info("htc_suspend_resume_worker:"
 		" boost cpu freq to 1.5GHz by RIL\n");
 }
 
@@ -1087,22 +1005,6 @@ static int __init tegra_cpufreq_init(void)
 	tegra_cpu_edp_init(false);
 	INIT_WORK(&htc_suspend_resume_work, htc_suspend_resume_worker);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	pm_qos_add_request(&boost_cpu_freq_req, PM_QOS_CPU_FREQ_MIN, (s32)PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
-	pm_qos_add_request(&cap_cpu_freq_req, PM_QOS_CPU_FREQ_MAX, (s32)PM_QOS_CPU_FREQ_MAX_DEFAULT_VALUE);
-
-	tegra_cpufreq_powersave_early_suspender.suspend = tegra_cpufreq_powersave_early_suspend;
-	tegra_cpufreq_powersave_early_suspender.resume = tegra_cpufreq_powersave_late_resume;
-	tegra_cpufreq_powersave_early_suspender.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 100;
-	register_early_suspend(&tegra_cpufreq_powersave_early_suspender);
-
-	tegra_cpufreq_performance_early_suspender.suspend = tegra_cpufreq_performance_early_suspend;
-	tegra_cpufreq_performance_early_suspender.resume = tegra_cpufreq_performance_late_resume;
-	tegra_cpufreq_performance_early_suspender.level = 0;
-	register_early_suspend(&tegra_cpufreq_performance_early_suspender);
-#endif
-
-
 	ret = cpufreq_register_notifier(
 		&tegra_cpufreq_policy_nb, CPUFREQ_POLICY_NOTIFIER);
 	if (ret)
@@ -1116,12 +1018,7 @@ static void __exit tegra_cpufreq_exit(void)
 	tegra_throttle_exit();
 	tegra_cpu_edp_exit();
 	tegra_auto_hotplug_exit();
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	pm_qos_remove_request(&boost_cpu_freq_req);
-	pm_qos_remove_request(&cap_cpu_freq_req);
-	unregister_early_suspend(&tegra_cpufreq_performance_early_suspender);
-	unregister_early_suspend(&tegra_cpufreq_powersave_early_suspender);
-#endif
+
 	cpufreq_unregister_driver(&tegra_cpufreq_driver);
 	cpufreq_unregister_notifier(
 		&tegra_cpufreq_policy_nb, CPUFREQ_POLICY_NOTIFIER);
