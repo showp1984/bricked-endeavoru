@@ -228,9 +228,6 @@ void cpu_idle(void)
 			{
 				getnstimeofday(&ts);
 				rtc_time_to_tm(ts.tv_sec - (sys_tz.tz_minuteswest * 60), &tm);
-				printk(KERN_INFO "[PM] hTC PM Statistic  %02d-%02d %02d:%02d:%02d \n",
-					tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
-				htc_print_active_wake_locks();
 			}
 			bPrint_wake_lock = !bPrint_wake_lock;
 		}
