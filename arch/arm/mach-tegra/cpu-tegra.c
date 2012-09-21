@@ -945,6 +945,7 @@ static struct cpufreq_driver tegra_cpufreq_driver = {
 	.attr		= tegra_cpufreq_attr,
 };
 
+#if 0
 static void htc_suspend_resume_worker(struct work_struct *w)
 {
 	pm_qos_update_request(&cap_cpu_freq_req,
@@ -977,6 +978,7 @@ static struct kernel_param_ops ril_boost_ops = {
 };
 
 module_param_cb(ril_boost, &ril_boost_ops, &ril_boost, 0644);
+#endif
 
 static int __init tegra_cpufreq_init(void)
 {
@@ -1003,7 +1005,7 @@ static int __init tegra_cpufreq_init(void)
 
 	freq_table = table_data->freq_table;
 	tegra_cpu_edp_init(false);
-	INIT_WORK(&htc_suspend_resume_work, htc_suspend_resume_worker);
+//	INIT_WORK(&htc_suspend_resume_work, htc_suspend_resume_worker);
 
 	ret = cpufreq_register_notifier(
 		&tegra_cpufreq_policy_nb, CPUFREQ_POLICY_NOTIFIER);
