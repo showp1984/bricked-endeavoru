@@ -78,6 +78,7 @@ static DEFINE_PER_CPU(struct tegra_mpdec_cpudata_t, tegra_mpdec_cpudata);
 static struct tegra_mpdec_cpudata_t tegra_mpdec_lpcpudata;
 
 static struct delayed_work tegra_mpdec_work;
+static struct delayed_work tegra_mpdec_suspended_work;
 static DEFINE_MUTEX(tegra_cpu_lock);
 static DEFINE_MUTEX(tegra_lpcpu_lock);
 
@@ -306,18 +307,41 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
 
 void mpdecision_gmode_notifier(void)
 {
-        /* if we are suspended, don't switch to gmode */
-        if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
-                pr_err(MPDEC_TAG"CPU[LP] freq override: we are suspended!"
-                       " Don't switch to gmode.\n");
-                return;
+        if (tegra_lp_cpu_handler(false, true)) {
+                /* if we are suspended, start lp checks */
+                if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
+                        schedule_delayed_work(&tegra_mpdec_suspended_work,
+                                              TEGRA_MPDEC_LPCPU_UPDELAY);
+                }
+        } else {
+                pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
         }
 
-        if(!tegra_lp_cpu_handler(false, true))
-                pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
         return;
 }
 EXPORT_SYMBOL_GPL(mpdecision_gmode_notifier);
+
+static void tegra_mpdec_suspended_work_thread(struct work_struct *work)
+{
+        unsigned int rq_depth;
+        rq_depth = get_rq_info();
+
+        if ((rq_depth <= NwNs_Threshold[1]) &&
+            (get_rate(0) <= idle_top_freq) &&
+            (!is_lp_cluster())) {
+                if (!tegra_lp_cpu_handler(true, false))
+                        pr_err(MPDEC_TAG"CPU[LP] error, cannot power up.\n");
+                else
+                        return;
+        }
+
+        /* LP CPU is not up again, reschedule for next check.
+           Since we are suspended, double the delay to save resources */
+        schedule_delayed_work(&tegra_mpdec_suspended_work,
+                              (TEGRA_MPDEC_DELAY * 2));
+
+        return;
+}
 
 static void tegra_mpdec_work_thread(struct work_struct *work)
 {
@@ -772,6 +796,8 @@ static int __init tegra_mpdec(void)
         was_paused = true;
 
 	INIT_DELAYED_WORK(&tegra_mpdec_work, tegra_mpdec_work_thread);
+        INIT_DELAYED_WORK(&tegra_mpdec_suspended_work,
+                          tegra_mpdec_suspended_work_thread);
 	if (state != TEGRA_MPDEC_DISABLED)
 		schedule_delayed_work(&tegra_mpdec_work, 0);
 
