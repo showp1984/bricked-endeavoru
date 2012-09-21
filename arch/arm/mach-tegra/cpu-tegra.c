@@ -544,7 +544,6 @@ int tegra_update_cpu_speed(unsigned long rate)
 	char buffer[MAX_LOCAL_BUFFER];
 	char *bptr = buffer;
 	unsigned long rate_save = rate;
-	int orig_nice = 0;
 	u32 suspend_ms;
 
 	freqs.old = tegra_getspeed(0);
@@ -559,14 +558,6 @@ int tegra_update_cpu_speed(unsigned long rate)
 
 	if (freqs.new < rate_save && rate_save >= 880000) {
 		if (is_lp_cluster()) {
-			orig_nice = task_nice(current);
-
-			if(can_nice(current, -20)) {
-				set_user_nice(current, -20);
-			} else {
-				pr_err("[cpufreq] can not nice(-20)!!");
-			}
-
 			CPU_DEBUG_PRINTK(CPU_DEBUG_HOTPLUG,
 					 " leave LPCPU (%s)", __func__);
 
@@ -600,13 +591,11 @@ int tegra_update_cpu_speed(unsigned long rate)
 		if (ret) {
 			pr_err("cpu-tegra: Failed to scale mselect for cpu"
 			       " frequency %u kHz\n", freqs.new);
-			goto error;
 		}
 		ret = clk_set_rate(emc_clk, tegra_emc_to_cpu_ratio(freqs.new));
 		if (ret) {
 			pr_err("cpu-tegra: Failed to scale emc for cpu"
 			       " frequency %u kHz\n", freqs.new);
-			goto error;
 		}
 	}
 
@@ -633,7 +622,6 @@ int tegra_update_cpu_speed(unsigned long rate)
 	if (ret) {
 		pr_err("cpu-tegra: Failed to set cpu frequency to %d kHz\n",
 			freqs.new);
-		goto error;
 	}
 
 	rtc_after = tegra_rtc_read_ms();
@@ -675,15 +663,6 @@ int tegra_update_cpu_speed(unsigned long rate)
 	if (freqs.old > freqs.new) {
 		clk_set_rate(emc_clk, tegra_emc_to_cpu_ratio(freqs.new));
 		tegra_update_mselect_rate(freqs.new);
-	}
-error:
-	if (orig_nice != task_nice(current)) {
-		if (can_nice(current, orig_nice)) {
-			set_user_nice(current, orig_nice);
-		} else {
-			pr_err("[cpufreq] can not restore nice(%d)!!",
-					orig_nice);
-		}
 	}
 
 	return ret;
