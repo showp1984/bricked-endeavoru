@@ -598,7 +598,7 @@ static int baseband_modem_power_on(struct baseband_power_platform_data *data)
 	auto_sleep(10);
 	pr_info("%s }\n", __func__);
 
-	pr_info("%s:VP pm qos request CPU 1.5GHz\n", __func__);
+	pr_info("%s:VP pm qos request CPU %uMHz\n", __func__, tegra_pmqos_boost_freq);
 	pm_qos_update_request(&modem_boost_cpu_freq_req, 
 				(s32)tegra_pmqos_boost_freq);
 
