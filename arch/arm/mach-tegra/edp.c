@@ -313,20 +313,14 @@ void __init tegra_init_cpu_edp_limits(unsigned int regulator_mA)
 #ifdef CONFIG_TEGRA3_VARIANT_CPU_OVERCLOCK
 	switch (cpu_process_id) {
 		case 3:
-			boost0 = T3_VARIANT_3_BOOST0;
-			boostx = T3_VARIANT_3_BOOSTX;
-			break;
 		case 2:
-			boost0 = T3_VARIANT_2_BOOST0;
-			boostx = T3_VARIANT_2_BOOSTX;
-			break;
-		case 1:
-			boost0 = T3_VARIANT_1_BOOST0;
-			boostx = T3_VARIANT_1_BOOSTX;
-			break;
+                case 1:
 		case 0:
+			boost0 = T3_VARIANT_BOOST0;
+			boostx = T3_VARIANT_BOOSTX;
+			break;
 		default:
-			boost0 = GAMING_REDUCTION_FREQ;
+			boost0 = -10;
 			boostx = 0;
 			break;
 	}
@@ -345,12 +339,7 @@ void __init tegra_init_cpu_edp_limits(unsigned int regulator_mA)
 		e[j].freq_limits[3] =
 			(unsigned int)(t[i+j].freq_limits[3]+boostx) * 10000;
 #else
-#ifdef CONFIG_TEGRA3_GAMING_FIX
-		e[j].freq_limits[0] =
-			(unsigned int)(t[i+j].freq_limits[0]+GAMING_REDUCTION_FREQ) * 10000;
-#else
 		e[j].freq_limits[0] = (unsigned int)(t[i+j].freq_limits[0]) * 10000;
-#endif
 		e[j].freq_limits[1] = (unsigned int)(t[i+j].freq_limits[1]) * 10000;
 		e[j].freq_limits[2] = (unsigned int)(t[i+j].freq_limits[2]) * 10000;
 		e[j].freq_limits[3] = (unsigned int)(t[i+j].freq_limits[3]) * 10000;
@@ -435,11 +424,6 @@ void tegra_get_system_edp_limits(const unsigned int **limits)
 }
 
 #ifdef CONFIG_DEBUG_FS
-
-#ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
-extern int cpu_process_id_orig;
-#endif
-
 static int t3_variant_debugfs_show(struct seq_file *s, void *data)
 {
 	int cpu_speedo_id = tegra_cpu_speedo_id();
@@ -447,9 +431,6 @@ static int t3_variant_debugfs_show(struct seq_file *s, void *data)
 	int cpu_process_id = tegra_cpu_process_id();
 	int core_process_id = tegra_core_process_id();
 
-#ifdef CONFIG_TEGRA3_VARIANT_OVERRIDE
-	cpu_process_id = cpu_process_id_orig;
-#endif
 	seq_printf(s, "cpu_speedo_id => %d\n", cpu_speedo_id);
 	seq_printf(s, "soc_speedo_id => %d\n", soc_speedo_id);
 	seq_printf(s, "cpu_process_id => %d\n", cpu_process_id);
