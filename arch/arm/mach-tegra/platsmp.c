@@ -33,6 +33,7 @@
 #include "reset.h"
 #include "sleep.h"
 #include "cpu-tegra.h"
+#include "tegra_pmqos.h"
 
 bool tegra_all_cpus_booted;
 
@@ -215,7 +216,9 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 			   switching */
 			unsigned int speed = max(tegra_getspeed(0),
 				clk_get_min_rate(cpu_g_clk) / 1000);
-			tegra_update_cpu_speed(speed);
+                        if ((speed != tegra_pmqos_boost_freq) && (speed > clk_get_min_rate(cpu_g_clk) / 1000))
+                                speed = tegra_pmqos_boost_freq;
+                        tegra_update_cpu_speed(speed);
 			status = clk_set_parent(cpu_clk, cpu_g_clk);
 		}
 
