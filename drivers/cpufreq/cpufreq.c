@@ -509,6 +509,8 @@ static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy,
         ret = sscanf(buf, "%u", &new_policy.max);
         if (ret != 1)
                 return -EINVAL;
+        if (new_policy.max <= 475000)
+                return -EINVAL;
         tegra_pmqos_boost_freq = new_policy.max;
 
         ret = __cpufreq_set_policy(policy, &new_policy);
