@@ -111,9 +111,7 @@ bool was_paused = false;
 
 static unsigned long get_rate(int cpu)
 {
-        unsigned long rate = 0;
-        rate = tegra_getspeed(cpu);
-        return rate;
+        return tegra_getspeed(cpu);
 }
 
 static int get_slowest_cpu(void)
