@@ -165,14 +165,18 @@ static int get_slowest_cpu_rate(void)
 static bool lp_possible(void)
 {
         int i = 0;
-        bool possible = true;
+        unsigned int speed;
 
         for (i = 1; i < CONFIG_NR_CPUS; i++) {
                 if (cpu_online(i))
-                        possible = false;
+                        return false;
         }
 
-        return possible;
+        speed = tegra_getspeed(0);
+        if (speed > idle_top_freq)
+                return false;
+
+        return true;
 }
 
 static int mp_decision(void)
