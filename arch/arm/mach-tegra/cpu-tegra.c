@@ -884,6 +884,13 @@ static int tegra_cpu_init(struct cpufreq_policy *policy)
 		register_pm_notifier(&tegra_cpu_pm_notifier);
 	}
 
+        /* restore saved cpu frequency */
+        if (!is_lp_cluster()) {
+                policy->max = tegra_pmqos_boost_freq;
+                tegra_update_cpu_speed(tegra_pmqos_boost_freq);
+                pr_info("cpu-tegra_cpufreq: restored cpu[%d]'s freq: %u\n", policy->cpu, policy->max);
+        }
+
 	return 0;
 }
 

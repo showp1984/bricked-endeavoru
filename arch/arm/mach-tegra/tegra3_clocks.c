@@ -4555,11 +4555,11 @@ static struct tegra_cpufreq_table_data cpufreq_tables[] = {
 	{ freq_table_1p0GHz, 1, 8},
 	{ freq_table_1p3GHz, 1, 10},
 	{ freq_table_1p4GHz, 1, 11},
-	{ freq_table_1p5GHz, 1, 12},
+	{ freq_table_1p5GHz, 1, 13},
 #ifdef CONFIG_TEGRA3_VARIANT_CPU_OVERCLOCK
-	{ freq_table_1p6GHz, 1, 12},
+	{ freq_table_1p6GHz, 1, 13},
 #endif
-	{ freq_table_1p7GHz, 1, 12},
+	{ freq_table_1p7GHz, 1, 13},
 };
 
 static int clip_cpu_rate_limits(

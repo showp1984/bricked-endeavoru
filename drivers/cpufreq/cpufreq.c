@@ -33,6 +33,8 @@
 
 #include <trace/events/power.h>
 
+#include "../arch/arm/mach-tegra/tegra_pmqos.h"
+
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_CORE, \
 						"cpufreq-core", msg)
 
@@ -491,7 +493,32 @@ static ssize_t store_##file_name					\
 }
 
 store_one(scaling_min_freq, min);
+#ifndef CONFIG_TEGRA_MPDECISION
 store_one(scaling_max_freq, max);
+#else
+static ssize_t store_scaling_max_freq(struct cpufreq_policy *policy,
+                                      const char *buf, size_t count)
+{
+        unsigned int ret = -EINVAL;
+        struct cpufreq_policy new_policy;
+
+        ret = cpufreq_get_policy(&new_policy, policy->cpu);
+        if (ret)
+                return -EINVAL;
+
+        ret = sscanf(buf, "%u", &new_policy.max);
+        if (ret != 1)
+                return -EINVAL;
+        if (new_policy.max <= 475000)
+                return -EINVAL;
+        tegra_pmqos_boost_freq = new_policy.max;
+
+        ret = __cpufreq_set_policy(policy, &new_policy);
+        policy->user_policy.max = new_policy.max;
+
+        return ret ? ret : count;
+}
+#endif
 
 /**
  * show_cpuinfo_cur_freq - current CPU frequency as detected by hardware
