@@ -336,7 +336,7 @@ static void tegra_mpdec_suspended_work_thread(struct work_struct *work)
 
         if ((rq_depth <= NwNs_Threshold[1]) &&
             (get_rate(0) <= idle_top_freq) &&
-            (!is_lp_cluster())) {
+            (!is_lp_cluster()) && (lp_possible())) {
                 if (!tegra_lp_cpu_handler(true, false))
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power up.\n");
         }
