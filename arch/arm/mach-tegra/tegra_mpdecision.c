@@ -80,6 +80,7 @@ static struct tegra_mpdec_cpudata_t tegra_mpdec_lpcpudata;
 static struct delayed_work tegra_mpdec_work;
 static struct delayed_work tegra_mpdec_suspended_work;
 static DEFINE_MUTEX(tegra_cpu_lock);
+static DEFINE_MUTEX(tegra_cpu_suspend_lock);
 static DEFINE_MUTEX(tegra_lpcpu_lock);
 
 static struct tegra_mpdec_tuners {
@@ -328,15 +329,19 @@ static void tegra_mpdec_suspended_work_thread(struct work_struct *work)
         unsigned int rq_depth;
         rq_depth = get_rq_info();
 
+        if (!mutex_trylock(&tegra_cpu_suspend_lock))
+                goto out;
+
         if ((rq_depth <= NwNs_Threshold[1]) &&
             (get_rate(0) <= idle_top_freq) &&
             (!is_lp_cluster())) {
                 if (!tegra_lp_cpu_handler(true, false))
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power up.\n");
-                else
-                        return;
         }
 
+        mutex_unlock(&tegra_cpu_suspend_lock);
+
+out:
         /* LP CPU is not up again, reschedule for next check.
            Since we are suspended, double the delay to save resources */
         schedule_delayed_work(&tegra_mpdec_suspended_work,
