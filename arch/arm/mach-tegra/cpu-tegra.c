@@ -572,7 +572,7 @@ int tegra_update_cpu_speed(unsigned long rate)
                          * mpdecision would not know about this. Notify mpdecision
                          * instead to switch to G mode
                          */
-                        mpdecision_gmode_notifier();
+                        (void) mpdecision_gmode_notifier();
 #endif
 			/* restore the target frequency, and
 			 * let the rest of the function handle
