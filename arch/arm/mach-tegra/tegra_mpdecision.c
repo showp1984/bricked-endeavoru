@@ -433,7 +433,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 }
 		break;
 	case TEGRA_MPDEC_LPCPU_UP:
-                if ((!is_lp_cluster()) && (lp_possible()))
+                if ((!is_lp_cluster()) && (lp_possible())) {
                         /* hysteresis loop for lpcpu powerup
                            this prevents the lpcpu to kick in too early and produce lags
                            we need at least 5 requests in order to power up the lpcpu */
@@ -443,6 +443,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power up.\n");
                                 lp_req = 0;
                         }
+                }
 		break;
 	default:
 		pr_err(MPDEC_TAG"%s: invalid mpdec hotplug state %d\n",
