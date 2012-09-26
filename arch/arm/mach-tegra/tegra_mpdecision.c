@@ -318,6 +318,14 @@ void mpdecision_gmode_notifier(void)
                         if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
                                 schedule_delayed_work(&tegra_mpdec_suspended_work,
                                                       TEGRA_MPDEC_LPCPU_UPDELAY);
+                        } else {
+                                /* we need to cancel the main workqueue here and restart it
+                                 * with the original delay again. Otherwise it may happen
+                                 * that the lpcpu will jump on/off in < set delay intervals
+                                 */
+                                cancel_delayed_work_sync(&tegra_mpdec_work);
+                                schedule_delayed_work(&tegra_mpdec_work,
+                                                      msecs_to_jiffies(TEGRA_MPDEC_LPCPU_DOWNDELAY));
                         }
                 } else {
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
