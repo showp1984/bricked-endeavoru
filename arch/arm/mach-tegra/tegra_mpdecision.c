@@ -510,9 +510,7 @@ static void tegra_mpdec_late_resume(struct early_suspend *h)
 {
 	int cpu = nr_cpu_ids;
 	for_each_possible_cpu(cpu) {
-		mutex_lock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = false;
-		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
         /* always switch back to g mode on resume */
         if (is_lp_cluster())
