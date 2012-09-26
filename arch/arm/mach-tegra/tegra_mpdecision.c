@@ -268,6 +268,9 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
         switch (state) {
         case true:
                 if(!clk_set_parent(cpu_clk, cpu_lp_clk)) {
+                        /* catch-up with governor target speed */
+                        tegra_cpu_set_speed_cap(NULL);
+
                         pr_info(MPDEC_TAG"CPU[LP] off->on | Mask=[%d.%d%d%d%d]\n",
                                 is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
                                 cpu_online(1), cpu_online(2), cpu_online(3));
@@ -280,6 +283,9 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
                 break;
         case false:
                 if (!clk_set_parent(cpu_clk, cpu_g_clk)) {
+                        /* catch-up with governor target speed */
+                        tegra_cpu_set_speed_cap(NULL);
+
                         on_time = ktime_to_ms(ktime_get()) - tegra_mpdec_lpcpudata.on_time;
                         tegra_mpdec_lpcpudata.online = false;
 
@@ -298,9 +304,6 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
                 }
                 break;
         }
-
-        /* catch-up with governor target speed */
-        tegra_cpu_set_speed_cap(NULL);
 
         mutex_unlock(&tegra_lpcpu_lock);
 
