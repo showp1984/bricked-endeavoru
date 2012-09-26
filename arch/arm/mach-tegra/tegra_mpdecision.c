@@ -316,7 +316,7 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
                 return 1;
 }
 
-void mpdecision_gmode_notifier(void)
+int mpdecision_gmode_notifier(void)
 {
         if (is_lp_cluster()) {
                 if (tegra_lp_cpu_handler(false, true)) {
@@ -335,10 +335,13 @@ void mpdecision_gmode_notifier(void)
                         }
                 } else {
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
+                        return 0;
                 }
+        } else {
+                return 0;
         }
 
-        return;
+        return 1;
 }
 EXPORT_SYMBOL_GPL(mpdecision_gmode_notifier);
 
