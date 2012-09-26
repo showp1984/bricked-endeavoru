@@ -312,14 +312,16 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
 
 void mpdecision_gmode_notifier(void)
 {
-        if (tegra_lp_cpu_handler(false, true)) {
-                /* if we are suspended, start lp checks */
-                if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
-                        schedule_delayed_work(&tegra_mpdec_suspended_work,
-                                              TEGRA_MPDEC_LPCPU_UPDELAY);
+        if (is_lp_cluster()) {
+                if (tegra_lp_cpu_handler(false, true)) {
+                        /* if we are suspended, start lp checks */
+                        if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
+                                schedule_delayed_work(&tegra_mpdec_suspended_work,
+                                                      TEGRA_MPDEC_LPCPU_UPDELAY);
+                        }
+                } else {
+                        pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
                 }
-        } else {
-                pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
         }
 
         return;
