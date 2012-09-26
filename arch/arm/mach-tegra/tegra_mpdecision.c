@@ -399,10 +399,12 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 
 	state = mp_decision();
 	switch (state) {
-	case TEGRA_MPDEC_DISABLED:
 	case TEGRA_MPDEC_IDLE:
+                lp_req = 0;
+	case TEGRA_MPDEC_DISABLED:
 		break;
 	case TEGRA_MPDEC_DOWN:
+                lp_req = 0;
                 cpu = get_slowest_cpu();
                 if (cpu < nr_cpu_ids) {
                         if ((per_cpu(tegra_mpdec_cpudata, cpu).online == true) && (cpu_online(cpu))) {
@@ -421,6 +423,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 }
 		break;
 	case TEGRA_MPDEC_UP:
+                lp_req = 0;
                 cpu = cpumask_next_zero(0, cpu_online_mask);
                 if (cpu < nr_cpu_ids) {
                         if ((per_cpu(tegra_mpdec_cpudata, cpu).online == false) && (!cpu_online(cpu))) {
@@ -439,6 +442,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 }
 		break;
 	case TEGRA_MPDEC_LPCPU_DOWN:
+                lp_req = 0;
                 if (is_lp_cluster()) {
                         if(!tegra_lp_cpu_handler(false, false))
                                 pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
