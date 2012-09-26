@@ -105,6 +105,8 @@ static unsigned int idle_bottom_freq;
 static unsigned int NwNs_Threshold[8] = {16, 12, 24, 14, 30, 16, 0, 18};
 static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
 
+static unsigned int lp_cpu_hysteresis = 4;
+
 extern unsigned int get_rq_info(void);
 
 unsigned int state = TEGRA_MPDEC_IDLE;
@@ -438,7 +440,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                            this prevents the lpcpu to kick in too early and produce lags
                            we need at least 5 requests in order to power up the lpcpu */
                         lp_req++;
-                        if (lp_req > 4) {
+                        if (lp_req > lp_cpu_hysteresis) {
                                 if(!tegra_lp_cpu_handler(true, false))
                                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power up.\n");
                                 lp_req = 0;
@@ -605,6 +607,26 @@ store_one_nwns(nwns_threshold_5, 5);
 store_one_nwns(nwns_threshold_6, 6);
 store_one_nwns(nwns_threshold_7, 7);
 
+static ssize_t show_lpcpu_hysteresis(struct kobject *kobj, struct attribute *attr,
+                                   char *buf)
+{
+	return sprintf(buf, "%u\n", lp_cpu_hysteresis);
+}
+
+static ssize_t store_lpcpu_hysteresis(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	long unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%lu", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	lp_cpu_hysteresis = input;
+
+	return count;
+}
+
 static ssize_t show_idle_freq (struct kobject *kobj, struct attribute *attr,
                                    char *buf)
 {
@@ -743,6 +765,7 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
 	return count;
 }
 
+define_one_global_rw(lpcpu_hysteresis);
 define_one_global_rw(startdelay);
 define_one_global_rw(delay);
 define_one_global_rw(pause);
@@ -750,6 +773,7 @@ define_one_global_rw(idle_freq);
 define_one_global_rw(enabled);
 
 static struct attribute *tegra_mpdec_attributes[] = {
+        &lpcpu_hysteresis.attr,
 	&startdelay.attr,
 	&delay.attr,
 	&pause.attr,
