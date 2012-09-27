@@ -78,7 +78,10 @@ static DEFINE_PER_CPU(struct tegra_mpdec_cpudata_t, tegra_mpdec_cpudata);
 static struct tegra_mpdec_cpudata_t tegra_mpdec_lpcpudata;
 
 static struct delayed_work tegra_mpdec_work;
+static struct workqueue_struct *tegra_mpdec_workq;
 static struct delayed_work tegra_mpdec_suspended_work;
+static struct workqueue_struct *tegra_mpdec_suspended_workq;
+
 static DEFINE_MUTEX(tegra_cpu_lock);
 static DEFINE_MUTEX(tegra_cpu_suspend_lock);
 static DEFINE_MUTEX(tegra_lpcpu_lock);
@@ -319,7 +322,7 @@ void mpdecision_gmode_notifier(void)
                 if (tegra_lp_cpu_handler(false, true)) {
                         /* if we are suspended, start lp checks */
                         if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
-                                schedule_delayed_work(&tegra_mpdec_suspended_work,
+                                queue_delayed_work(tegra_mpdec_suspended_workq, &tegra_mpdec_suspended_work,
                                                       TEGRA_MPDEC_LPCPU_UPDELAY);
                         } else {
                                 /* we need to cancel the main workqueue here and restart it
@@ -327,7 +330,7 @@ void mpdecision_gmode_notifier(void)
                                  * that the lpcpu will jump on/off in < set delay intervals
                                  */
                                 cancel_delayed_work_sync(&tegra_mpdec_work);
-                                schedule_delayed_work(&tegra_mpdec_work,
+                                queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
                                                       msecs_to_jiffies(TEGRA_MPDEC_LPCPU_DOWNDELAY));
                         }
                 } else {
@@ -359,7 +362,7 @@ static void tegra_mpdec_suspended_work_thread(struct work_struct *work)
 out:
         /* LP CPU is not up again, reschedule for next check.
            Since we are suspended, double the delay to save resources */
-        schedule_delayed_work(&tegra_mpdec_suspended_work,
+        queue_delayed_work(tegra_mpdec_suspended_workq, &tegra_mpdec_suspended_work,
                               (TEGRA_MPDEC_DELAY * 2));
 
         return;
@@ -476,15 +479,15 @@ out:
                  * than the default mpdecision delay. */
                 switch (state) {
 	        case TEGRA_MPDEC_LPCPU_DOWN:
-                        schedule_delayed_work(&tegra_mpdec_work,
+                        queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
                                 msecs_to_jiffies(TEGRA_MPDEC_LPCPU_DOWNDELAY));
                         break;
 	        case TEGRA_MPDEC_LPCPU_UP:
-                        schedule_delayed_work(&tegra_mpdec_work,
+                        queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
                                 msecs_to_jiffies(TEGRA_MPDEC_LPCPU_UPDELAY));
 		        break;
                 default:
-                        schedule_delayed_work(&tegra_mpdec_work,
+                        queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
                                 msecs_to_jiffies(tegra_mpdec_tuners_ins.delay));
                 }
         }
@@ -771,7 +774,8 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
 	case '1':
 		state = TEGRA_MPDEC_IDLE;
 		was_paused = true;
-		schedule_delayed_work(&tegra_mpdec_work, 0);
+                queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
+                                   msecs_to_jiffies(tegra_mpdec_tuners_ins.delay));
 		pr_info(MPDEC_TAG"firing up mpdecision...\n");
 		break;
 	default:
@@ -820,7 +824,7 @@ static struct attribute_group tegra_mpdec_attr_group = {
 };
 /**************************** SYSFS END ****************************/
 
-static int __init tegra_mpdec(void)
+static int __init tegra_mpdec_init(void)
 {
 	int cpu, rc, err = 0;
 
@@ -842,11 +846,22 @@ static int __init tegra_mpdec(void)
 
         was_paused = true;
 
+	tegra_mpdec_workq = alloc_workqueue(
+		"mpdec", WQ_UNBOUND | WQ_RESCUER | WQ_FREEZABLE, 1);
+	if (!tegra_mpdec_workq)
+		return -ENOMEM;
 	INIT_DELAYED_WORK(&tegra_mpdec_work, tegra_mpdec_work_thread);
+
+	tegra_mpdec_suspended_workq = alloc_workqueue(
+		"mpdec_sus", WQ_UNBOUND | WQ_RESCUER | WQ_FREEZABLE, 1);
+	if (!tegra_mpdec_suspended_workq)
+		return -ENOMEM;
         INIT_DELAYED_WORK(&tegra_mpdec_suspended_work,
                           tegra_mpdec_suspended_work_thread);
+
 	if (state != TEGRA_MPDEC_DISABLED)
-		schedule_delayed_work(&tegra_mpdec_work, 0);
+                queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
+                                   msecs_to_jiffies(tegra_mpdec_tuners_ins.delay));
 
 	register_early_suspend(&tegra_mpdec_early_suspend_handler);
 
@@ -865,5 +880,10 @@ static int __init tegra_mpdec(void)
 	return err;
 }
 
-late_initcall(tegra_mpdec);
+late_initcall(tegra_mpdec_init);
 
+void tegra_mpdec_exit(void)
+{
+	destroy_workqueue(tegra_mpdec_workq);
+	destroy_workqueue(tegra_mpdec_suspended_workq);
+}
