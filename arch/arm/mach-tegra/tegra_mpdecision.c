@@ -783,6 +783,8 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
 	case TEGRA_MPDEC_IDLE:
 	case TEGRA_MPDEC_DOWN:
 	case TEGRA_MPDEC_UP:
+        case TEGRA_MPDEC_LPCPU_UP:
+        case TEGRA_MPDEC_LPCPU_DOWN:
 		enabled = 1;
 		break;
 	default:
