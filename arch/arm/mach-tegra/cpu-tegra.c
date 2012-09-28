@@ -968,7 +968,6 @@ static void tegra_cpufreq_late_resume(struct early_suspend *h)
 }
 #endif
 
-#if 0
 static void htc_suspend_resume_worker(struct work_struct *w)
 {
 	pm_qos_update_request(&cap_cpu_freq_req,
@@ -978,7 +977,7 @@ static void htc_suspend_resume_worker(struct work_struct *w)
 	pm_qos_update_request(&boost_cpu_freq_req, (s32)tegra_pmqos_boost_freq);
 	tegra_update_cpu_speed(tegra_pmqos_boost_freq);
 	pr_info("htc_suspend_resume_worker:"
-		" boost cpu freq to 1.5GHz by RIL\n");
+		" boost cpu freq to %uMHz by RIL\n", tegra_pmqos_boost_freq);
 }
 
 static int ril_boost;
@@ -1001,7 +1000,6 @@ static struct kernel_param_ops ril_boost_ops = {
 };
 
 module_param_cb(ril_boost, &ril_boost_ops, &ril_boost, 0644);
-#endif
 
 static int __init tegra_cpufreq_init(void)
 {
@@ -1028,7 +1026,7 @@ static int __init tegra_cpufreq_init(void)
 
 	freq_table = table_data->freq_table;
 	tegra_cpu_edp_init(false);
-//	INIT_WORK(&htc_suspend_resume_work, htc_suspend_resume_worker);
+	INIT_WORK(&htc_suspend_resume_work, htc_suspend_resume_worker);
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
         pm_qos_add_request(&boost_cpu_freq_req, PM_QOS_CPU_FREQ_MIN, (s32)PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
