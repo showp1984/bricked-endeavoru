@@ -276,6 +276,24 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
         bool err = false;
         cputime64_t on_time = 0;
 
+        /* robustness checks */
+	if (!cpu_clk) {
+		printk(KERN_INFO "[MPDEC]: re-setting cpu_clk");
+		cpu_clk = clk_get_sys(NULL, "cpu");
+	}
+	if (!cpu_lp_clk) {
+		printk(KERN_INFO "[MPDEC]: re-setting cpu_lp_clk");
+		cpu_lp_clk = clk_get_sys(NULL, "cpu_lp");
+	}
+	if (!cpu_g_clk) {
+		printk(KERN_INFO "[MPDEC]: re-setting cpu_g_clk");
+		cpu_g_clk = clk_get_sys(NULL, "cpu_g");
+	}
+	if (IS_ERR(cpu_clk) || IS_ERR(cpu_lp_clk) || IS_ERR(cpu_g_clk)) {
+		printk(KERN_INFO "[MPDEC]: Error, cpu_clk/lp_lck/g_clk still not set");
+		return 0;
+	}
+
         if (!mutex_trylock(&tegra_lpcpu_lock))
                 return 0;
 
