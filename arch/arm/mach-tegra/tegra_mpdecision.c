@@ -277,7 +277,7 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
         cputime64_t on_time = 0;
 
         if (!mutex_trylock(&tegra_lpcpu_lock))
-                return 1;
+                return 0;
 
         /* true = up, false = down */
         switch (state) {
