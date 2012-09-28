@@ -541,6 +541,10 @@ static void tegra_mpdec_early_suspend(struct early_suspend *h)
 		per_cpu(tegra_mpdec_cpudata, cpu).device_suspended = true;
 		mutex_unlock(&per_cpu(tegra_mpdec_cpudata, cpu).suspend_mutex);
 	}
+
+        /* main work thread can sleep now */
+        cancel_delayed_work_sync(&tegra_mpdec_work);
+
         if (!is_lp_cluster())
                 if(!tegra_lp_cpu_handler(true, false)) {
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power up.\n");
@@ -560,6 +564,11 @@ static void tegra_mpdec_late_resume(struct early_suspend *h)
         if (is_lp_cluster())
                 if(!tegra_lp_cpu_handler(false, false))
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
+
+        /* wake up main work thread */
+        queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
+                           msecs_to_jiffies(tegra_mpdec_tuners_ins.delay));
+
 	pr_info(MPDEC_TAG"Screen -> on. Activated mpdecision. | Mask=[%d.%d%d%d%d]\n",
                 is_lp_cluster(), ((is_lp_cluster() == 1) ? 0 : cpu_online(0)),
                 cpu_online(1), cpu_online(2), cpu_online(3));
