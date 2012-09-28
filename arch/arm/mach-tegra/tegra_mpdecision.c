@@ -53,11 +53,21 @@
 /* This rq value will be used if we only have the lpcpu online */
 #define TEGRA_MPDEC_LPCPU_RQ_DOWN         36
 
-/* This will replace TEGRA_MPDEC_DELAY in each case. Though the
+/*
+ * This will replace TEGRA_MPDEC_DELAY in each case. Though the
  * values are identical do leave them here for future changes.
  */
 #define TEGRA_MPDEC_LPCPU_UPDELAY         TEGRA_MPDEC_DELAY
 #define TEGRA_MPDEC_LPCPU_DOWNDELAY       TEGRA_MPDEC_DELAY
+
+/*
+ * LPCPU hysteresis default values
+ * we need at least 5 requests to go into lpmode and
+ * we need at least 3 requests to come out of lpmode.
+ * This does not affect frequency overrides
+ */
+#define TEGRA_MPDEC_LPCPU_UP_HYS        4
+#define TEGRA_MPDEC_LPCPU_DOWN_HYS      2
 
 enum {
 	TEGRA_MPDEC_DISABLED = 0,
@@ -91,11 +101,15 @@ static struct tegra_mpdec_tuners {
 	unsigned int delay;
 	unsigned int pause;
 	unsigned long int idle_freq;
+        unsigned int lp_cpu_up_hysteresis;
+        unsigned int lp_cpu_down_hysteresis;
 } tegra_mpdec_tuners_ins = {
 	.startdelay = TEGRA_MPDEC_STARTDELAY,
 	.delay = TEGRA_MPDEC_DELAY,
 	.pause = TEGRA_MPDEC_PAUSE,
 	.idle_freq = TEGRA_MPDEC_IDLE_FREQ,
+        .lp_cpu_up_hysteresis = TEGRA_MPDEC_LPCPU_UP_HYS,
+        .lp_cpu_down_hysteresis = TEGRA_MPDEC_LPCPU_DOWN_HYS,
 };
 
 static struct clk *cpu_clk;
@@ -107,8 +121,6 @@ static unsigned int idle_bottom_freq;
 
 static unsigned int NwNs_Threshold[8] = {16, 12, 24, 14, 30, 16, 0, 18};
 static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
-
-static unsigned int lp_cpu_hysteresis = 4;
 
 extern unsigned int get_rq_info(void);
 
@@ -378,7 +390,8 @@ out:
 static void tegra_mpdec_work_thread(struct work_struct *work)
 {
 	unsigned int cpu = nr_cpu_ids;
-        static int lp_req = 0;
+        static int lpup_req = 0;
+        static int lpdown_req = 0;
 	cputime64_t on_time = 0;
         bool suspended = false;
 
@@ -413,11 +426,13 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 	state = mp_decision();
 	switch (state) {
 	case TEGRA_MPDEC_IDLE:
-                lp_req = 0;
+                lpup_req = 0;
+                lpdown_req = 0;
 	case TEGRA_MPDEC_DISABLED:
 		break;
 	case TEGRA_MPDEC_DOWN:
-                lp_req = 0;
+                lpup_req = 0;
+                lpdown_req = 0;
                 cpu = get_slowest_cpu();
                 if (cpu < nr_cpu_ids) {
                         if ((per_cpu(tegra_mpdec_cpudata, cpu).online == true) && (cpu_online(cpu))) {
@@ -436,7 +451,8 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 }
 		break;
 	case TEGRA_MPDEC_UP:
-                lp_req = 0;
+                lpup_req = 0;
+                lpdown_req = 0;
                 cpu = cpumask_next_zero(0, cpu_online_mask);
                 if (cpu < nr_cpu_ids) {
                         if ((per_cpu(tegra_mpdec_cpudata, cpu).online == false) && (!cpu_online(cpu))) {
@@ -455,22 +471,30 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
                 }
 		break;
 	case TEGRA_MPDEC_LPCPU_DOWN:
-                lp_req = 0;
+                lpup_req = 0;
                 if (is_lp_cluster()) {
-                        if(!tegra_lp_cpu_handler(false, false))
-                                pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
+                        /* hysteresis loop for lpcpu powerdown
+                           this prevents the lpcpu to kick out too early and produce lags
+                           we need at least 3 requests in order to power down the lpcpu */
+                        lpdown_req++;
+                        if (lpdown_req > tegra_mpdec_tuners_ins.lp_cpu_down_hysteresis) {
+                                if(!tegra_lp_cpu_handler(false, false))
+                                        pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
+                                lpdown_req = 0;
+                        }
                 }
 		break;
 	case TEGRA_MPDEC_LPCPU_UP:
+                lpdown_req = 0;
                 if ((!is_lp_cluster()) && (lp_possible())) {
                         /* hysteresis loop for lpcpu powerup
                            this prevents the lpcpu to kick in too early and produce lags
                            we need at least 5 requests in order to power up the lpcpu */
-                        lp_req++;
-                        if (lp_req > lp_cpu_hysteresis) {
+                        lpup_req++;
+                        if (lpup_req > tegra_mpdec_tuners_ins.lp_cpu_up_hysteresis) {
                                 if(!tegra_lp_cpu_handler(true, false))
                                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power up.\n");
-                                lp_req = 0;
+                                lpup_req = 0;
                         }
                 }
 		break;
@@ -557,6 +581,8 @@ static ssize_t show_##file_name						\
 show_one(startdelay, startdelay);
 show_one(delay, delay);
 show_one(pause, pause);
+show_one(lpcpu_up_hysteresis, lp_cpu_up_hysteresis);
+show_one(lpcpu_down_hysteresis, lp_cpu_down_hysteresis);
 
 #define show_one_twts(file_name, arraypos)                              \
 static ssize_t show_##file_name                                         \
@@ -632,13 +658,7 @@ store_one_nwns(nwns_threshold_5, 5);
 store_one_nwns(nwns_threshold_6, 6);
 store_one_nwns(nwns_threshold_7, 7);
 
-static ssize_t show_lpcpu_hysteresis(struct kobject *kobj, struct attribute *attr,
-                                   char *buf)
-{
-	return sprintf(buf, "%u\n", lp_cpu_hysteresis);
-}
-
-static ssize_t store_lpcpu_hysteresis(struct kobject *a, struct attribute *b,
+static ssize_t store_lpcpu_up_hysteresis(struct kobject *a, struct attribute *b,
 				   const char *buf, size_t count)
 {
 	long unsigned int input;
@@ -647,7 +667,21 @@ static ssize_t store_lpcpu_hysteresis(struct kobject *a, struct attribute *b,
 	if (ret != 1)
 		return -EINVAL;
 
-	lp_cpu_hysteresis = input;
+	tegra_mpdec_tuners_ins.lp_cpu_up_hysteresis = input;
+
+	return count;
+}
+
+static ssize_t store_lpcpu_down_hysteresis(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	long unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%lu", &input);
+	if (ret != 1)
+		return -EINVAL;
+
+	tegra_mpdec_tuners_ins.lp_cpu_down_hysteresis = input;
 
 	return count;
 }
@@ -791,7 +825,8 @@ static ssize_t store_enabled(struct kobject *a, struct attribute *b,
 	return count;
 }
 
-define_one_global_rw(lpcpu_hysteresis);
+define_one_global_rw(lpcpu_up_hysteresis);
+define_one_global_rw(lpcpu_down_hysteresis);
 define_one_global_rw(startdelay);
 define_one_global_rw(delay);
 define_one_global_rw(pause);
@@ -799,7 +834,8 @@ define_one_global_rw(idle_freq);
 define_one_global_rw(enabled);
 
 static struct attribute *tegra_mpdec_attributes[] = {
-        &lpcpu_hysteresis.attr,
+        &lpcpu_up_hysteresis.attr,
+        &lpcpu_down_hysteresis.attr,
 	&startdelay.attr,
 	&delay.attr,
 	&pause.attr,
