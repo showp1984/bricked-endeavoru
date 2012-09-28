@@ -896,7 +896,7 @@ static int __init tegra_mpdec_init(void)
 	INIT_DELAYED_WORK(&tegra_mpdec_work, tegra_mpdec_work_thread);
 
 	tegra_mpdec_suspended_workq = alloc_workqueue(
-		"mpdec_sus", WQ_UNBOUND | WQ_RESCUER | WQ_FREEZABLE, 1);
+		"mpdec_sus", WQ_UNBOUND | WQ_RESCUER, 1);
 	if (!tegra_mpdec_suspended_workq)
 		return -ENOMEM;
         INIT_DELAYED_WORK(&tegra_mpdec_suspended_work,
