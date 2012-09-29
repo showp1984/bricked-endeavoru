@@ -217,8 +217,6 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 			   switching */
 			unsigned int speed = max(tegra_getspeed(0),
 				clk_get_min_rate(cpu_g_clk) / 1000);
-                        if ((speed != tegra_pmqos_boost_freq) && (speed > clk_get_min_rate(cpu_g_clk) / 1000))
-                                speed = tegra_pmqos_boost_freq;
                         tegra_update_cpu_speed(speed);
 
 			/* change to g mode */
