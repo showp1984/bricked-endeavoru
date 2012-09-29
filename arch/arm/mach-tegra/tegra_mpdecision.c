@@ -360,6 +360,7 @@ int mpdecision_gmode_notifier(void)
                                  * that the lpcpu will jump on/off in < set delay intervals
                                  */
                                 cancel_delayed_work_sync(&tegra_mpdec_work);
+                                was_paused = true;
                                 queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
                                                       msecs_to_jiffies(TEGRA_MPDEC_LPCPU_DOWNDELAY));
                         }
