@@ -35,9 +35,7 @@ extern int usb_get_connect_type(void);
 #define SYN_I2C_RETRY_TIMES 10
 #define SYN_WIRELESS_DEBUG
 /* #define SYN_CABLE_CONTROL */
-#ifndef CONFIG_TOUCHSCREEN_SYNAPTICS_AOSP
-#define SYN_CALIBRATION_CONTROL
-#endif
+/*#define SYN_CALIBRATION_CONTROL*/
 /* #define SYN_FILTER_CONTROL */
 /* #define SYN_FLASH_PROGRAMMING_LOG */
 /* #define SYN_DISABLE_CONFIG_UPDATE */
