@@ -103,6 +103,8 @@ static struct tegra_mpdec_tuners {
 	unsigned long int idle_freq;
         unsigned int lp_cpu_up_hysteresis;
         unsigned int lp_cpu_down_hysteresis;
+        unsigned int max_cpus;
+        unsigned int min_cpus;
 } tegra_mpdec_tuners_ins = {
 	.startdelay = TEGRA_MPDEC_STARTDELAY,
 	.delay = TEGRA_MPDEC_DELAY,
@@ -110,6 +112,8 @@ static struct tegra_mpdec_tuners {
 	.idle_freq = TEGRA_MPDEC_IDLE_FREQ,
         .lp_cpu_up_hysteresis = TEGRA_MPDEC_LPCPU_UP_HYS,
         .lp_cpu_down_hysteresis = TEGRA_MPDEC_LPCPU_DOWN_HYS,
+        .max_cpus = CONFIG_NR_CPUS,
+        .min_cpus = 1,
 };
 
 static struct clk *cpu_clk;
@@ -228,7 +232,7 @@ static int mp_decision(void)
 		index = (nr_cpu_online - 1) * 2;
 		if ((nr_cpu_online < CONFIG_NR_CPUS) && (rq_depth >= NwNs_Threshold[index])) {
 			if (total_time >= TwTs_Threshold[index]) {
-                                if (!is_lp_cluster())
+                                if ((!is_lp_cluster()) && (nr_cpu_online < tegra_mpdec_tuners_ins.max_cpus))
                                         new_state = TEGRA_MPDEC_UP;
                                 else if (rq_depth > TEGRA_MPDEC_LPCPU_RQ_DOWN)
                                         new_state = TEGRA_MPDEC_LPCPU_DOWN;
@@ -239,7 +243,7 @@ static int mp_decision(void)
 			}
 		} else if (rq_depth <= NwNs_Threshold[index+1]) {
 			if (total_time >= TwTs_Threshold[index+1] ) {
-                                if (nr_cpu_online > 1)
+                                if ((nr_cpu_online > 1) && (nr_cpu_online > tegra_mpdec_tuners_ins.min_cpus))
                                         new_state = TEGRA_MPDEC_DOWN;
                                 else if ((get_rate(0) <= idle_top_freq) && (!is_lp_cluster()))
                                         new_state = TEGRA_MPDEC_LPCPU_UP;
@@ -618,6 +622,8 @@ show_one(delay, delay);
 show_one(pause, pause);
 show_one(lpcpu_up_hysteresis, lp_cpu_up_hysteresis);
 show_one(lpcpu_down_hysteresis, lp_cpu_down_hysteresis);
+show_one(min_cpus, min_cpus);
+show_one(max_cpus, max_cpus);
 
 #define show_one_twts(file_name, arraypos)                              \
 static ssize_t show_##file_name                                         \
@@ -746,6 +752,34 @@ static ssize_t show_enabled(struct kobject *a, struct attribute *b,
 	return sprintf(buf, "%u\n", enabled);
 }
 
+static ssize_t store_max_cpus(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+	if ((ret != 1) || input > 4)
+		return -EINVAL;
+
+	tegra_mpdec_tuners_ins.max_cpus = input;
+
+	return count;
+}
+
+static ssize_t store_min_cpus(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+	if ((ret != 1) || input < 1)
+		return -EINVAL;
+
+	tegra_mpdec_tuners_ins.min_cpus = input;
+
+	return count;
+}
+
 static ssize_t store_startdelay(struct kobject *a, struct attribute *b,
 				   const char *buf, size_t count)
 {
@@ -869,6 +903,8 @@ define_one_global_rw(delay);
 define_one_global_rw(pause);
 define_one_global_rw(idle_freq);
 define_one_global_rw(enabled);
+define_one_global_rw(min_cpus);
+define_one_global_rw(max_cpus);
 
 static struct attribute *tegra_mpdec_attributes[] = {
         &lpcpu_up_hysteresis.attr,
@@ -878,6 +914,8 @@ static struct attribute *tegra_mpdec_attributes[] = {
 	&pause.attr,
 	&idle_freq.attr,
 	&enabled.attr,
+        &min_cpus.attr,
+        &max_cpus.attr,
 	&twts_threshold_0.attr,
 	&twts_threshold_1.attr,
 	&twts_threshold_2.attr,
