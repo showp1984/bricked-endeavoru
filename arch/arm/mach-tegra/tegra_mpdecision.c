@@ -46,7 +46,7 @@
 
 #define MPDEC_TAG                       "[MPDEC]: "
 #define TEGRA_MPDEC_STARTDELAY            20000
-#define TEGRA_MPDEC_DELAY                 150
+#define TEGRA_MPDEC_DELAY                 70
 #define TEGRA_MPDEC_PAUSE                 10000
 #define TEGRA_MPDEC_IDLE_FREQ             475000
 
@@ -57,8 +57,8 @@
  * This will replace TEGRA_MPDEC_DELAY in each case. Though the
  * values are identical do leave them here for future changes.
  */
-#define TEGRA_MPDEC_LPCPU_UPDELAY         TEGRA_MPDEC_DELAY
-#define TEGRA_MPDEC_LPCPU_DOWNDELAY       TEGRA_MPDEC_DELAY
+#define TEGRA_MPDEC_LPCPU_UPDELAY         70
+#define TEGRA_MPDEC_LPCPU_DOWNDELAY       2000
 
 /*
  * LPCPU hysteresis default values
