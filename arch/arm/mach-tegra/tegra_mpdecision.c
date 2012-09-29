@@ -92,9 +92,9 @@ static struct workqueue_struct *tegra_mpdec_workq;
 static struct delayed_work tegra_mpdec_suspended_work;
 static struct workqueue_struct *tegra_mpdec_suspended_workq;
 
-static DEFINE_MUTEX(tegra_cpu_lock);
-static DEFINE_MUTEX(tegra_cpu_suspend_lock);
-static DEFINE_MUTEX(tegra_lpcpu_lock);
+static DEFINE_MUTEX(mpdec_tegra_cpu_lock);
+static DEFINE_MUTEX(mpdec_tegra_cpu_suspend_lock);
+static DEFINE_MUTEX(mpdec_tegra_lpcpu_lock);
 
 static struct tegra_mpdec_tuners {
 	unsigned int startdelay;
@@ -294,7 +294,7 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
 		return 0;
 	}
 
-        if (!mutex_trylock(&tegra_lpcpu_lock))
+        if (!mutex_trylock(&mpdec_tegra_lpcpu_lock))
                 return 0;
 
         /* true = up, false = down */
@@ -338,7 +338,7 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
                 break;
         }
 
-        mutex_unlock(&tegra_lpcpu_lock);
+        mutex_unlock(&mpdec_tegra_lpcpu_lock);
 
         if (err)
                 return 0;
@@ -381,7 +381,7 @@ static void tegra_mpdec_suspended_work_thread(struct work_struct *work)
         unsigned int rq_depth;
         rq_depth = get_rq_info();
 
-        if (!mutex_trylock(&tegra_cpu_suspend_lock))
+        if (!mutex_trylock(&mpdec_tegra_cpu_suspend_lock))
                 goto out;
 
         if ((rq_depth <= NwNs_Threshold[1]) &&
@@ -390,12 +390,12 @@ static void tegra_mpdec_suspended_work_thread(struct work_struct *work)
                 if (!tegra_lp_cpu_handler(true, false)) {
                         pr_err(MPDEC_TAG"CPU[LP] error, cannot power up.\n");
                 } else {
-                        mutex_unlock(&tegra_cpu_suspend_lock);
+                        mutex_unlock(&mpdec_tegra_cpu_suspend_lock);
                         return;
                 }
         }
 
-        mutex_unlock(&tegra_cpu_suspend_lock);
+        mutex_unlock(&mpdec_tegra_cpu_suspend_lock);
 
 out:
         /* LP CPU is not up again, reschedule for next check.
@@ -424,7 +424,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 	if (suspended == true)
 		goto out;
 
-	if (!mutex_trylock(&tegra_cpu_lock))
+	if (!mutex_trylock(&mpdec_tegra_cpu_lock))
 		goto out;
 
 	/* if sth messed with the cpus, update the check vars so we can proceed */
@@ -521,7 +521,7 @@ static void tegra_mpdec_work_thread(struct work_struct *work)
 		pr_err(MPDEC_TAG"%s: invalid mpdec hotplug state %d\n",
 		       __func__, state);
 	}
-	mutex_unlock(&tegra_cpu_lock);
+	mutex_unlock(&mpdec_tegra_cpu_lock);
 
 out:
 	if (state != TEGRA_MPDEC_DISABLED) {
