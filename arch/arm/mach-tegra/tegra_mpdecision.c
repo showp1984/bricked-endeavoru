@@ -348,30 +348,34 @@ static int tegra_lp_cpu_handler(bool state, bool notifier)
 
 int mpdecision_gmode_notifier(void)
 {
-        if (is_lp_cluster()) {
-                if (tegra_lp_cpu_handler(false, true)) {
-                        /* if we are suspended, start lp checks */
-                        if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
-                                queue_delayed_work(tegra_mpdec_suspended_workq, &tegra_mpdec_suspended_work,
-                                                      TEGRA_MPDEC_LPCPU_UPDELAY);
-                        } else {
-                                /* we need to cancel the main workqueue here and restart it
-                                 * with the original delay again. Otherwise it may happen
-                                 * that the lpcpu will jump on/off in < set delay intervals
-                                 */
-                                cancel_delayed_work_sync(&tegra_mpdec_work);
-                                was_paused = true;
-                                queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
-                                                      msecs_to_jiffies(TEGRA_MPDEC_LPCPU_DOWNDELAY));
-                        }
+        if (!is_lp_cluster())
+                return 0;
+
+        if (!mutex_trylock(&mpdec_tegra_cpu_lock))
+                return 0;
+
+        if (tegra_lp_cpu_handler(false, true)) {
+                /* if we are suspended, start lp checks */
+                if ((per_cpu(tegra_mpdec_cpudata, 0).device_suspended == true)) {
+                        queue_delayed_work(tegra_mpdec_suspended_workq, &tegra_mpdec_suspended_work,
+                                           TEGRA_MPDEC_LPCPU_UPDELAY);
                 } else {
-                        pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
-                        return 0;
+                        /* we need to cancel the main workqueue here and restart it
+                         * with the original delay again. Otherwise it may happen
+                         * that the lpcpu will jump on/off in < set delay intervals
+                         */
+                        cancel_delayed_work_sync(&tegra_mpdec_work);
+                        was_paused = true;
+                        queue_delayed_work(tegra_mpdec_workq, &tegra_mpdec_work,
+                                           msecs_to_jiffies(TEGRA_MPDEC_LPCPU_DOWNDELAY));
                 }
         } else {
+                pr_err(MPDEC_TAG"CPU[LP] error, cannot power down.\n");
+                mutex_unlock(&mpdec_tegra_cpu_lock);
                 return 0;
         }
 
+        mutex_unlock(&mpdec_tegra_cpu_lock);
         return 1;
 }
 EXPORT_SYMBOL_GPL(mpdecision_gmode_notifier);
