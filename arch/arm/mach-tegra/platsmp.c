@@ -39,6 +39,7 @@ bool tegra_all_cpus_booted;
 
 static DECLARE_BITMAP(tegra_cpu_init_bits, CONFIG_NR_CPUS) __read_mostly;
 const struct cpumask *const tegra_cpu_init_mask = to_cpumask(tegra_cpu_init_bits);
+
 #define tegra_cpu_init_map	(*(cpumask_t *)tegra_cpu_init_mask)
 
 #define CLK_RST_CONTROLLER_CLK_CPU_CMPLX \
@@ -216,9 +217,9 @@ int boot_secondary(unsigned int cpu, struct task_struct *idle)
 			   switching */
 			unsigned int speed = max(tegra_getspeed(0),
 				clk_get_min_rate(cpu_g_clk) / 1000);
-                        if ((speed != tegra_pmqos_boost_freq) && (speed > clk_get_min_rate(cpu_g_clk) / 1000))
-                                speed = tegra_pmqos_boost_freq;
                         tegra_update_cpu_speed(speed);
+
+			/* change to g mode */
 			status = clk_set_parent(cpu_clk, cpu_g_clk);
 		}
 
