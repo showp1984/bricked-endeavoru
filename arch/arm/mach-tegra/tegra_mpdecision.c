@@ -123,7 +123,7 @@ static struct clk *cpu_lp_clk;
 static unsigned int idle_top_freq;
 static unsigned int idle_bottom_freq;
 
-static unsigned int NwNs_Threshold[8] = {16, 12, 24, 14, 30, 16, 0, 18};
+static unsigned int NwNs_Threshold[8] = {16, 10, 24, 12, 30, 16, 0, 18};
 static unsigned int TwTs_Threshold[8] = {140, 0, 140, 190, 140, 190, 0, 190};
 
 extern unsigned int get_rq_info(void);
